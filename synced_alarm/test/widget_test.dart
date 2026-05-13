@@ -1,0 +1,176 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+import 'package:synced_alarm/src/app/synced_alarm_app.dart';
+import 'package:synced_alarm/src/data/app_providers.dart';
+import 'package:synced_alarm/src/models/alarm.dart';
+import 'package:synced_alarm/src/platform/alarm_task_controller.dart';
+
+void main() {
+  testWidgets('shows the alarm list shell', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value(const <Alarm>[])),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Alarms'), findsWidgets);
+    expect(find.byTooltip('New alarm'), findsOneWidget);
+  });
+
+  testWidgets('opens the alarm editor', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value(const <Alarm>[])),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('New alarm'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set alarm'), findsOneWidget);
+    expect(find.text('Label'), findsOneWidget);
+  });
+
+  testWidgets('shows a dedicated alarm screen while an alarm is ringing', (
+    WidgetTester tester,
+  ) async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+          ringingAlarmProvider.overrideWith(
+            () => _FixedRingingAlarmNotifier(alarm),
+          ),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('8:30 AM'), findsOneWidget);
+    expect(find.text('Morning standup'), findsOneWidget);
+    expect(find.text('Dismiss'), findsOneWidget);
+    expect(find.text('Snooze'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byTooltip('New alarm'), findsNothing);
+  });
+
+  testWidgets('dismiss on ringing screen sends Android task to back', (
+    WidgetTester tester,
+  ) async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: false,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final calls = <MethodCall>[];
+    const channel = MethodChannel('com.teamproject.synced_alarm/alarm_task');
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call);
+      return null;
+    });
+    FlutterLocalNotificationsPlatform.instance =
+        _FakeAndroidLocalNotificationsPlugin();
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await AlarmTaskController.moveTaskToBack();
+      expect(calls.map((call) => call.method), contains('moveTaskToBack'));
+      calls.clear();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+            ringingAlarmProvider.overrideWith(
+              () => _FixedRingingAlarmNotifier(alarm),
+            ),
+          ],
+          child: const SyncedAlarmApp(),
+        ),
+      );
+      await tester.pump();
+
+      final dismissButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Dismiss'),
+      );
+      expect(dismissButton.onPressed, isNotNull);
+      dismissButton.onPressed?.call();
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(calls.map((call) => call.method), contains('moveTaskToBack'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    }
+  });
+}
+
+class _FixedRingingAlarmNotifier extends RingingAlarmNotifier {
+  _FixedRingingAlarmNotifier(this.alarm);
+
+  final Alarm alarm;
+
+  @override
+  Alarm? build() => alarm;
+}
+
+class _FakeAndroidLocalNotificationsPlugin
+    extends AndroidFlutterLocalNotificationsPlugin {
+  @override
+  Future<bool> initialize({
+    required AndroidInitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+    DidReceiveBackgroundNotificationResponseCallback?
+    onDidReceiveBackgroundNotificationResponse,
+  }) async {
+    return true;
+  }
+
+  @override
+  Future<NotificationAppLaunchDetails?>
+  getNotificationAppLaunchDetails() async {
+    return null;
+  }
+
+  @override
+  Future<void> createNotificationChannel(
+    AndroidNotificationChannel notificationChannel,
+  ) async {}
+
+  @override
+  Future<bool?> requestNotificationsPermission() async => true;
+
+  @override
+  Future<void> cancel({required int id, String? tag}) async {}
+}
