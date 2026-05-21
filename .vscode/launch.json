@@ -5,23 +5,47 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "synced_alarm",
+      "name": "synced_alarm (Firebase Production)",
+      "cwd": "synced_alarm",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=USE_FIREBASE=true"
+      ]
+    },
+    {
+      "name": "synced_alarm (Firebase Emulator - Android)",
       "cwd": "synced_alarm",
       "request": "launch",
       "type": "dart",
       "toolArgs": [
         "--dart-define=USE_FIREBASE=true",
-        "--dart-define=ALARM_GROUP_ID=demo",
-        "--dart-define=ALARM_ACCESS_CODE=teamproject1-d7ffe9987130ce9c",
-        "--dart-define=ALARM_DEVICE_ID=android-dev"
+        "--dart-define=USE_FIREBASE_EMULATOR=true",
+        "--dart-define=FIREBASE_EMULATOR_HOST=10.0.2.2"
       ]
+    },
+    {
+      "name": "synced_alarm (Firebase Emulator - Web/PC)",
+      "cwd": "synced_alarm",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=USE_FIREBASE=true",
+        "--dart-define=USE_FIREBASE_EMULATOR=true",
+        "--dart-define=FIREBASE_EMULATOR_HOST=localhost"
+      ]
+    },
+    {
+      "name": "synced_alarm (Local Demo Only)",
+      "cwd": "synced_alarm",
+      "request": "launch",
+      "type": "dart"
     },
     {
       "name": "synced_alarm (profile mode)",
       "cwd": "synced_alarm",
       "request": "launch",
       "type": "dart",
-
       "flutterMode": "profile"
     },
     {
