@@ -7,7 +7,10 @@ import 'package:synced_alarm/src/platform/alarm_notification_service.dart';
 
 void main() {
   test('uses a dedicated ringing channel with repeated sound flag', () {
-    expect(alarmNotificationChannelId, 'synced_alarm_ringing_v2');
+    expect(
+      alarmNotificationChannelId,
+      'synced_alarm_ringing_v3_sound_vibration',
+    );
     expect(alarmSyncNotificationChannelId, 'synced_alarm_sync_v1');
     expect(alarmNotificationSoundRepeatFlag, 4);
   });
@@ -185,6 +188,35 @@ void main() {
 
     expect(request.scheduledAt, DateTime(2026, 5, 7, 9, 5));
     expect(request.matchDateTimeComponents, isNull);
+  });
+
+  test('builds weekly scheduled notifications for selected weekdays', () {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Class',
+      timeOfDayMinutes: 8 * 60,
+      enabled: true,
+      repeatWeekdays: {DateTime.monday, DateTime.wednesday},
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+    final requests = AlarmNotificationRequest.scheduledRequestsFromAlarm(
+      alarm,
+      from: DateTime(2026, 5, 17, 9),
+    );
+
+    expect(requests, hasLength(2));
+    expect(
+      requests.map((request) => request.matchDateTimeComponents),
+      everyElement(DateTimeComponents.dayOfWeekAndTime),
+    );
+    expect(
+      requests.map((request) => request.scheduledAt),
+      containsAll([DateTime(2026, 5, 18, 8), DateTime(2026, 5, 20, 8)]),
+    );
+    expect(requests.map((request) => request.id).toSet(), hasLength(2));
   });
 
   test('builds notification payload from command data', () {

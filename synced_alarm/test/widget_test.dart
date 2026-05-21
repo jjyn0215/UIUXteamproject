@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:synced_alarm/src/app/synced_alarm_app.dart';
 import 'package:synced_alarm/src/data/app_providers.dart';
@@ -11,6 +12,10 @@ import 'package:synced_alarm/src/models/alarm.dart';
 import 'package:synced_alarm/src/platform/alarm_task_controller.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('shows the alarm list shell', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -24,6 +29,7 @@ void main() {
 
     expect(find.text('Alarms'), findsWidgets);
     expect(find.byTooltip('New alarm'), findsOneWidget);
+    expect(find.byIcon(Icons.sync_disabled_rounded), findsOneWidget);
   });
 
   testWidgets('opens the alarm editor', (WidgetTester tester) async {
@@ -120,12 +126,9 @@ void main() {
       );
       await tester.pump();
 
-      final dismissButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Dismiss'),
-      );
-      expect(dismissButton.onPressed, isNotNull);
-      dismissButton.onPressed?.call();
-      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, 'Dismiss'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Dismiss'));
+      await tester.pumpAndSettle(const Duration(seconds: 1));
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(calls.map((call) => call.method), contains('moveTaskToBack'));

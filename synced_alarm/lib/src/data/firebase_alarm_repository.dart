@@ -24,7 +24,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String groupId,
     required String accessCode,
   }) async {
-    await _ensureSignedIn();
+    _ensureSignedIn();
     final callable = _functions.httpsCallable('joinGroup');
     await withFirebaseOperationTimeout(
       callable.call<Map<String, Object?>>({
@@ -40,7 +40,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String groupId,
     required String accessCode,
   }) async* {
-    await joinGroup(groupId: groupId, accessCode: accessCode);
+    _ensureSignedIn();
     yield* _group(groupId)
         .collection('alarms')
         .orderBy('timeOfDayMinutes')
@@ -54,7 +54,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
 
   @override
   Future<void> upsertAlarm(Alarm alarm, {required String accessCode}) async {
-    await joinGroup(groupId: alarm.groupId, accessCode: accessCode);
+    _ensureSignedIn();
     await _group(alarm.groupId)
         .collection('alarms')
         .doc(alarm.id)
@@ -67,7 +67,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String alarmId,
     required String accessCode,
   }) async {
-    await joinGroup(groupId: groupId, accessCode: accessCode);
+    _ensureSignedIn();
     await _group(groupId).collection('alarms').doc(alarmId).delete();
   }
 
@@ -78,7 +78,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required bool enabled,
     required String accessCode,
   }) async {
-    await joinGroup(groupId: groupId, accessCode: accessCode);
+    _ensureSignedIn();
     await _group(groupId).collection('alarms').doc(alarmId).set({
       'enabled': enabled,
       'updatedAt': DateTime.now().toIso8601String(),
@@ -92,7 +92,7 @@ class FirebaseAlarmRepository implements AlarmRepository {
     AlarmCommand command, {
     required String accessCode,
   }) async {
-    await joinGroup(groupId: command.groupId, accessCode: accessCode);
+    _ensureSignedIn();
     await _group(
       command.groupId,
     ).collection('commands').doc(command.id).set(command.toJson());
@@ -102,12 +102,9 @@ class FirebaseAlarmRepository implements AlarmRepository {
     return _firestore.collection('groups').doc(groupId);
   }
 
-  Future<void> _ensureSignedIn() async {
+  void _ensureSignedIn() {
     if (_auth.currentUser == null) {
-      await withFirebaseOperationTimeout(
-        _auth.signInAnonymously(),
-        operationName: 'anonymous sign-in',
-      );
+      throw StateError('Sign in before using Firebase alarms.');
     }
   }
 }

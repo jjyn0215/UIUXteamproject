@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/app_providers.dart';
+import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/alarm.dart';
 import '../../platform/alarm_task_controller.dart';
@@ -81,7 +82,8 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   Widget build(BuildContext context) {
     final alarms = ref.watch(alarmsProvider);
     final ringingAlarm = ref.watch(ringingAlarmProvider);
-    ref.watch(deviceRegistrationProvider);
+    final syncStatus = ref.watch(syncStatusProvider);
+    final l10n = AppLocalizations.of(context);
     if (ringingAlarm != null) {
       return AlarmRingScreen(
         alarm: ringingAlarm,
@@ -99,21 +101,18 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     }
 
     final title = switch (_selectedTab) {
-      0 => 'Alarms',
-      1 => 'History',
-      _ => 'Settings',
+      0 => l10n.alarms,
+      1 => l10n.history,
+      _ => l10n.settings,
     };
 
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         actions: [
-          IconButton(
-            tooltip: 'Sync status',
-            icon: const Icon(Icons.sync_rounded),
-            onPressed: () {
-              setState(() => _selectedTab = 2);
-            },
+          _SyncStatusButton(
+            status: syncStatus,
+            onPressed: () => setState(() => _selectedTab = 2),
           ),
         ],
       ),
@@ -155,7 +154,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
       ),
       floatingActionButton: _selectedTab == 0
           ? FloatingActionButton(
-              tooltip: 'New alarm',
+              tooltip: l10n.newAlarm,
               onPressed: () => showAlarmEditor(context),
               backgroundColor: SereneWakeColors.primary,
               foregroundColor: SereneWakeColors.surface,
@@ -170,22 +169,22 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
         onDestinationSelected: (index) {
           setState(() => _selectedTab = index);
         },
-        backgroundColor: SereneWakeColors.surface,
-        indicatorColor: SereneWakeColors.primarySoft,
-        destinations: const [
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        indicatorColor: Theme.of(context).colorScheme.primaryContainer,
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.alarm_outlined),
-            selectedIcon: Icon(Icons.alarm_rounded),
-            label: 'Alarms',
+            icon: const Icon(Icons.alarm_outlined),
+            selectedIcon: const Icon(Icons.alarm_rounded),
+            label: l10n.alarms,
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_rounded),
-            label: 'History',
+            icon: const Icon(Icons.history_rounded),
+            label: l10n.history,
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings_rounded),
+            label: l10n.settings,
           ),
         ],
       ),
@@ -300,6 +299,64 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   }
 }
 
+class _SyncStatusButton extends StatelessWidget {
+  const _SyncStatusButton({required this.status, required this.onPressed});
+
+  final SyncStatus status;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status.type == SyncStatusType.syncing) {
+      return IconButton(
+        tooltip: status.label,
+        onPressed: onPressed,
+        icon: SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
+    }
+
+    return IconButton(
+      tooltip: _tooltip,
+      icon: Icon(_icon),
+      color: _color(context),
+      onPressed: onPressed,
+    );
+  }
+
+  String get _tooltip {
+    final detail = status.detail;
+    if (detail == null || detail.isEmpty) return status.label;
+    return '${status.label}: $detail';
+  }
+
+  IconData get _icon {
+    return switch (status.type) {
+      SyncStatusType.local => Icons.sync_disabled_rounded,
+      SyncStatusType.needsGroup => Icons.sync_problem_rounded,
+      SyncStatusType.syncing => Icons.sync_rounded,
+      SyncStatusType.active => Icons.cloud_done_rounded,
+      SyncStatusType.error => Icons.error_outline_rounded,
+    };
+  }
+
+  Color _color(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return switch (status.type) {
+      SyncStatusType.local => colorScheme.outline,
+      SyncStatusType.needsGroup => Colors.orange.shade700,
+      SyncStatusType.syncing => colorScheme.primary,
+      SyncStatusType.active => colorScheme.primary,
+      SyncStatusType.error => colorScheme.error,
+    };
+  }
+}
+
 class _AlarmListView extends StatelessWidget {
   const _AlarmListView({
     required this.alarms,
@@ -383,6 +440,7 @@ class _NextAlarmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final next = alarm.nextOccurrence(now);
     final duration = next.difference(now);
     final hours = duration.inHours;
@@ -409,9 +467,9 @@ class _NextAlarmCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Next Alarm',
+            l10n.nextAlarm,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: SereneWakeColors.primary,
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -419,7 +477,7 @@ class _NextAlarmCard extends StatelessWidget {
           Text(
             alarm.timeLabel,
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              color: SereneWakeColors.primaryDark,
+              color: Theme.of(context).colorScheme.primary,
               fontSize: 32,
               fontWeight: FontWeight.w700,
               letterSpacing: 0,
@@ -434,14 +492,14 @@ class _NextAlarmCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: SereneWakeColors.text,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ),
               Text(
-                'Starts in $remaining',
+                l10n.startsIn(remaining),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: SereneWakeColors.primaryDark,
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -479,10 +537,11 @@ class _AlarmCardState extends State<_AlarmCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final alarm = widget.alarm;
     final subtitle = alarm.enabled
-        ? _formatNext(alarm.nextOccurrence(widget.now), widget.now)
-        : 'Off';
+        ? _formatNext(alarm.nextOccurrence(widget.now), widget.now, l10n)
+        : l10n.off;
 
     return Card(
       child: InkWell(
@@ -504,8 +563,10 @@ class _AlarmCardState extends State<_AlarmCard> {
                           style: Theme.of(context).textTheme.headlineMedium
                               ?.copyWith(
                                 color: alarm.enabled
-                                    ? SereneWakeColors.text
-                                    : SereneWakeColors.mutedText,
+                                    ? Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium?.color
+                                    : Theme.of(context).colorScheme.outline,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0,
                               ),
@@ -517,7 +578,9 @@ class _AlarmCardState extends State<_AlarmCard> {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: SereneWakeColors.text,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyMedium?.color,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -531,37 +594,46 @@ class _AlarmCardState extends State<_AlarmCard> {
                         ? null
                         : (enabled) async {
                             setState(() => _busy = true);
-                            await widget.onToggle(enabled);
-                            if (mounted) setState(() => _busy = false);
+                            try {
+                              await widget.onToggle(enabled);
+                            } catch (error) {
+                              _showActionError(error);
+                            } finally {
+                              if (mounted) setState(() => _busy = false);
+                            }
                           },
                   ),
                   PopupMenuButton<_AlarmAction>(
-                    tooltip: 'Alarm actions',
+                    tooltip: l10n.alarmActions,
                     onSelected: (action) async {
-                      switch (action) {
-                        case _AlarmAction.edit:
-                          widget.onEdit();
-                          return;
-                        case _AlarmAction.test:
-                          await widget.onTestRing();
-                          return;
-                        case _AlarmAction.delete:
-                          await _confirmDelete(context);
-                          return;
+                      try {
+                        switch (action) {
+                          case _AlarmAction.edit:
+                            widget.onEdit();
+                            return;
+                          case _AlarmAction.test:
+                            await widget.onTestRing();
+                            return;
+                          case _AlarmAction.delete:
+                            await _confirmDelete(context, l10n);
+                            return;
+                        }
+                      } catch (error) {
+                        _showActionError(error);
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
                       PopupMenuItem(
                         value: _AlarmAction.edit,
-                        child: Text('Edit'),
+                        child: Text(l10n.editAlarm),
                       ),
                       PopupMenuItem(
                         value: _AlarmAction.test,
-                        child: Text('Test ring'),
+                        child: Text(l10n.testRing),
                       ),
                       PopupMenuItem(
                         value: _AlarmAction.delete,
-                        child: Text('Delete'),
+                        child: Text(l10n.delete),
                       ),
                     ],
                   ),
@@ -573,11 +645,11 @@ class _AlarmCardState extends State<_AlarmCard> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: SereneWakeColors.mutedText,
+                  color: Theme.of(context).colorScheme.outline,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              _DayChips(enabled: alarm.enabled),
+              _DayChips(alarm: alarm),
             ],
           ),
         ),
@@ -585,20 +657,23 @@ class _AlarmCardState extends State<_AlarmCard> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete alarm?'),
+        title: Text(l10n.deleteConfirm),
         content: Text(widget.alarm.timeLabel),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -608,48 +683,82 @@ class _AlarmCardState extends State<_AlarmCard> {
     }
   }
 
-  String _formatNext(DateTime next, DateTime now) {
+  void _showActionError(Object error) {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${l10n.errorAlarmActionFailed}: $error')),
+    );
+  }
+
+  String _formatNext(DateTime next, DateTime now, AppLocalizations l10n) {
     final duration = next.difference(now);
-    if (duration.inMinutes < 1) return 'Rings now';
-    if (duration.inHours < 1) return 'Rings in ${duration.inMinutes} min';
-    return 'Rings in ${duration.inHours}h '
-        '${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
+    if (duration.inMinutes < 1) return l10n.ringsNow;
+    if (duration.inHours < 1) return l10n.ringsIn('${duration.inMinutes} min');
+    return l10n.ringsIn(
+      '${duration.inHours}h '
+      '${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}m',
+    );
   }
 }
 
 class _DayChips extends StatelessWidget {
-  const _DayChips({required this.enabled});
+  const _DayChips({required this.alarm});
 
-  final bool enabled;
+  final Alarm alarm;
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final l10n = AppLocalizations.of(context);
+    final labels = [
+      l10n.mon,
+      l10n.tue,
+      l10n.wed,
+      l10n.thu,
+      l10n.fri,
+      l10n.sat,
+      l10n.sun,
+    ];
     return Wrap(
       spacing: 6,
       children: [
         for (var index = 0; index < labels.length; index++)
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: enabled && index < 5
-                  ? SereneWakeColors.primarySoft
-                  : SereneWakeColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              labels[index],
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: enabled && index < 5
-                    ? SereneWakeColors.primaryDark
-                    : SereneWakeColors.mutedText,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+          _DayChip(
+            label: labels[index],
+            active: alarm.enabled && alarm.repeatWeekdays.contains(index + 1),
           ),
       ],
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({required this.label, required this.active});
+
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: active
+            ? Theme.of(context).colorScheme.primaryContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: active
+              ? Theme.of(context).colorScheme.onPrimaryContainer
+              : Theme.of(context).colorScheme.outline,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -659,6 +768,7 @@ class _HistoryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -670,14 +780,14 @@ class _HistoryPanel extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.history_rounded,
-                    color: SereneWakeColors.primary,
+                    color: Theme.of(context).colorScheme.primary,
                     size: 40,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'No alarm history',
+                    l10n.noHistory,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0,
@@ -700,22 +810,23 @@ class _EmptyAlarmPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: SereneWakeColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.alarm_add_rounded,
-            color: SereneWakeColors.primary,
+            color: Theme.of(context).colorScheme.primary,
             size: 40,
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No alarms yet',
+            l10n.noAlarms,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
               letterSpacing: 0,
@@ -725,7 +836,7 @@ class _EmptyAlarmPanel extends StatelessWidget {
           FilledButton.icon(
             onPressed: onCreate,
             icon: const Icon(Icons.add_rounded),
-            label: const Text('New alarm'),
+            label: Text(l10n.newAlarm),
           ),
         ],
       ),
@@ -738,8 +849,10 @@ class _LoadingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: CircularProgressIndicator(color: SereneWakeColors.primary),
+    return Center(
+      child: CircularProgressIndicator(
+        color: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 }
@@ -752,20 +865,21 @@ class _ErrorPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
-              color: SereneWakeColors.error,
+              color: Theme.of(context).colorScheme.error,
               size: 40,
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Sync unavailable',
+              l10n.syncUnavailable,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0,
@@ -776,14 +890,14 @@ class _ErrorPanel extends StatelessWidget {
               '$error',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: SereneWakeColors.mutedText,
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              label: Text(l10n.retry),
             ),
           ],
         ),

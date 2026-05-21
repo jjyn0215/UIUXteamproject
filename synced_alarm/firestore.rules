@@ -11,12 +11,37 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
     }
 
-    function validAlarm() {
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validUserProfile(uid) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'lastActiveGroupId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string;
+    }
+
+    function validAlarm(groupId) {
       return request.resource.data.keys().hasOnly([
           'groupId',
           'label',
           'timeOfDayMinutes',
           'enabled',
+          'repeatWeekdays',
+          'ringDurationMinutes',
+          'soundEnabled',
+          'vibrationEnabled',
+          'snoozeMinutes',
+          'maxSnoozeCount',
+          'snoozeCount',
           'snoozeUntil',
           'lastTriggeredDate',
           'createdAt',
@@ -25,14 +50,32 @@ service cloud.firestore {
           'revision'
         ])
         && request.resource.data.label is string
+        && request.resource.data.groupId == groupId
         && request.resource.data.timeOfDayMinutes is int
         && request.resource.data.timeOfDayMinutes >= 0
         && request.resource.data.timeOfDayMinutes < 1440
         && request.resource.data.enabled is bool
+        && request.resource.data.repeatWeekdays is list
+        && request.resource.data.repeatWeekdays.size() >= 1
+        && request.resource.data.repeatWeekdays.size() <= 7
+        && request.resource.data.ringDurationMinutes is int
+        && request.resource.data.ringDurationMinutes >= 1
+        && request.resource.data.ringDurationMinutes <= 60
+        && request.resource.data.soundEnabled is bool
+        && request.resource.data.vibrationEnabled is bool
+        && request.resource.data.snoozeMinutes is int
+        && request.resource.data.snoozeMinutes >= 1
+        && request.resource.data.snoozeMinutes <= 120
+        && request.resource.data.maxSnoozeCount is int
+        && request.resource.data.maxSnoozeCount >= 0
+        && request.resource.data.maxSnoozeCount <= 10
+        && request.resource.data.snoozeCount is int
+        && request.resource.data.snoozeCount >= 0
+        && request.resource.data.snoozeCount <= 10
         && request.resource.data.revision is int;
     }
 
-    function validCommand() {
+    function validCommand(groupId) {
       return request.resource.data.keys().hasOnly([
           'groupId',
           'alarmId',
@@ -41,12 +84,13 @@ service cloud.firestore {
           'createdAt',
           'expiresAt'
         ])
+        && request.resource.data.groupId == groupId
         && request.resource.data.alarmId is string
         && request.resource.data.commandType in ['ring', 'dismiss', 'snooze']
         && request.resource.data.sourceDeviceId is string;
     }
 
-    function validDevice() {
+    function validDevice(groupId) {
       return request.resource.data.keys().hasOnly([
           'uid',
           'groupId',
@@ -58,6 +102,7 @@ service cloud.firestore {
           'notificationsEnabled'
         ])
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.groupId == groupId
         && request.resource.data.platform is string
         && request.resource.data.notificationsEnabled is bool;
     }
@@ -73,22 +118,37 @@ service cloud.firestore {
 
       match /alarms/{alarmId} {
         allow read: if isGroupMember(groupId);
-        allow create, update: if isGroupMember(groupId) && validAlarm();
+        allow create, update: if isGroupMember(groupId) && validAlarm(groupId);
         allow delete: if isGroupMember(groupId);
       }
 
       match /devices/{deviceId} {
         allow read: if isGroupMember(groupId);
-        allow create, update: if isGroupMember(groupId) && validDevice();
+        allow create, update: if isGroupMember(groupId) && validDevice(groupId);
         allow delete: if isGroupMember(groupId)
           && resource.data.uid == request.auth.uid;
       }
 
       match /commands/{commandId} {
         allow read: if isGroupMember(groupId);
-        allow create: if isGroupMember(groupId) && validCommand();
+        allow create: if isGroupMember(groupId) && validCommand(groupId);
         allow update, delete: if false;
       }
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create, update: if isSelf(uid) && validUserProfile(uid);
+      allow delete: if false;
+
+      match /groups/{groupId} {
+        allow read: if isSelf(uid);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /groupSecrets/{groupId} {
+      allow read, write: if false;
     }
   }
 }

@@ -1,31 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/alarm.dart';
 import 'alarm_repository.dart';
 
 class LocalDemoAlarmRepository implements AlarmRepository {
-  LocalDemoAlarmRepository() {
-    final now = TimeOfDay.now();
-    _alarms = [
-      Alarm.create(
-        groupId: 'demo',
-        label: 'Morning focus',
-        time: TimeOfDay(hour: (now.hour + 1) % 24, minute: 30),
-        updatedBy: 'local-demo',
-      ),
-      Alarm.create(
-        groupId: 'demo',
-        label: 'Class reminder',
-        time: const TimeOfDay(hour: 14, minute: 0),
-        updatedBy: 'local-demo',
-      ).copyWith(enabled: false),
-    ];
-  }
+  LocalDemoAlarmRepository();
+
+  static const _prefsKey = 'synced_alarm_local_alarms_v1';
 
   final _controller = StreamController<List<Alarm>>.broadcast();
-  late List<Alarm> _alarms;
+  List<Alarm> _alarms = const [];
+  bool _loaded = false;
 
   @override
   Future<void> joinGroup({
@@ -42,6 +30,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     required String groupId,
     required String accessCode,
   }) async* {
+    await _ensureLoaded();
     yield _visibleAlarms(groupId);
     yield* _controller.stream.map((alarms) {
       return alarms.where((alarm) => alarm.groupId == groupId).toList();
@@ -50,6 +39,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
 
   @override
   Future<void> upsertAlarm(Alarm alarm, {required String accessCode}) async {
+    await _ensureLoaded();
     final index = _alarms.indexWhere((item) => item.id == alarm.id);
     final updated = alarm.copyWith(updatedAt: DateTime.now());
     if (index == -1) {
@@ -57,6 +47,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     } else {
       _alarms = [..._alarms]..[index] = updated;
     }
+    await _save();
     _emit();
   }
 
@@ -66,7 +57,9 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     required String alarmId,
     required String accessCode,
   }) async {
+    await _ensureLoaded();
     _alarms = _alarms.where((alarm) => alarm.id != alarmId).toList();
+    await _save();
     _emit();
   }
 
@@ -77,10 +70,12 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     required bool enabled,
     required String accessCode,
   }) async {
+    await _ensureLoaded();
     _alarms = [
       for (final alarm in _alarms)
         if (alarm.id == alarmId) alarm.copyWith(enabled: enabled) else alarm,
     ];
+    await _save();
     _emit();
   }
 
@@ -89,6 +84,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     AlarmCommand command, {
     required String accessCode,
   }) async {
+    await _ensureLoaded();
     _alarms = [
       for (final alarm in _alarms)
         if (alarm.id == command.alarmId)
@@ -97,9 +93,19 @@ class LocalDemoAlarmRepository implements AlarmRepository {
               clearSnooze: true,
               lastTriggeredDate: DateTime.now(),
             ),
-            AlarmCommandType.snooze => alarm.copyWith(
-              snoozeUntil: DateTime.now().add(const Duration(minutes: 5)),
-            ),
+            AlarmCommandType.snooze =>
+              alarm.maxSnoozeCount <= 0 ||
+                      alarm.snoozeCount >= alarm.maxSnoozeCount
+                  ? alarm.copyWith(
+                      clearSnooze: true,
+                      lastTriggeredDate: DateTime.now(),
+                    )
+                  : alarm.copyWith(
+                      snoozeUntil: DateTime.now().add(
+                        Duration(minutes: alarm.snoozeMinutes),
+                      ),
+                      snoozeCount: alarm.snoozeCount + 1,
+                    ),
             AlarmCommandType.ring => alarm.copyWith(
               lastTriggeredDate: DateTime.now(),
             ),
@@ -107,6 +113,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
         else
           alarm,
     ];
+    await _save();
     _emit();
   }
 
@@ -120,5 +127,50 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     if (!_controller.isClosed) {
       _controller.add(List.unmodifiable(_alarms));
     }
+  }
+
+  Future<void> _ensureLoaded() async {
+    if (_loaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString(_prefsKey);
+    if (encoded == null || encoded.isEmpty) {
+      _alarms = const [];
+      _loaded = true;
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(encoded);
+      if (decoded is List) {
+        _alarms =
+            [
+              for (final item in decoded)
+                if (item is Map<String, Object?>)
+                  Alarm.fromJson('${item['id'] ?? ''}', item),
+            ].where((alarm) {
+              return alarm.id.isNotEmpty && !_isLegacyDemoAlarm(alarm);
+            }).toList();
+      } else {
+        _alarms = const [];
+      }
+    } on Object {
+      _alarms = const [];
+    }
+    _loaded = true;
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = jsonEncode([
+      for (final alarm in _alarms) {'id': alarm.id, ...alarm.toJson()},
+    ]);
+    await prefs.setString(_prefsKey, encoded);
+  }
+
+  bool _isLegacyDemoAlarm(Alarm alarm) {
+    if (alarm.groupId != 'demo' || alarm.updatedBy != 'local-demo') {
+      return false;
+    }
+    return alarm.label == 'Morning focus' || alarm.label == 'Class reminder';
   }
 }

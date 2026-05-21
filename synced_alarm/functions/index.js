@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
@@ -11,56 +12,107 @@ const {
   onDocumentCreated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
-const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 
 initializeApp();
 
-const groupAccessCode = defineSecret("GROUP_ACCESS_CODE");
+exports.createGroup = onCall({
+  invoker: "public",
+}, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in before creating a group.");
+  }
+
+  const name = cleanName(request.data.name) || "Alarm Group";
+  const inviteCode = cleanInviteCode(request.data.inviteCode);
+  if (inviteCode.length < 4) {
+    throw new HttpsError("invalid-argument", "Invite code is too short.");
+  }
+
+  const db = getFirestore();
+  const groupId = await uniqueGroupId(db, name);
+  const groupRef = db.collection("groups").doc(groupId);
+  const secretRef = db.collection("groupSecrets").doc(groupId);
+  const memberRef = groupRef.collection("members").doc(request.auth.uid);
+  const userRef = db.collection("users").doc(request.auth.uid);
+  const userGroupRef = userRef.collection("groups").doc(groupId);
+
+  await db.runTransaction(async (transaction) => {
+    transaction.set(groupRef, {
+      name,
+      ownerUid: request.auth.uid,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.set(secretRef, {
+      inviteCodeHash: hashInviteCode(groupId, inviteCode),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    writeMembership(transaction, {
+      memberRef,
+      userRef,
+      userGroupRef,
+      auth: request.auth,
+      groupId,
+      name,
+      role: "owner",
+    });
+  });
+
+  return {groupId, name};
+});
 
 exports.joinGroup = onCall({
   invoker: "public",
-  secrets: [groupAccessCode],
 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before joining a group.");
   }
 
   const groupId = cleanId(request.data.groupId);
-  const accessCode = String(request.data.accessCode || "");
-  const expectedCode = groupAccessCode.value();
+  const accessCode = cleanInviteCode(
+    request.data.inviteCode || request.data.accessCode,
+  );
 
   if (!groupId) {
     throw new HttpsError("invalid-argument", "groupId is required.");
   }
-  if (!expectedCode || accessCode !== expectedCode) {
-    throw new HttpsError("permission-denied", "Invalid group access code.");
-  }
 
   const db = getFirestore();
   const groupRef = db.collection("groups").doc(groupId);
+  const secretRef = db.collection("groupSecrets").doc(groupId);
   const memberRef = groupRef.collection("members").doc(request.auth.uid);
+  const userRef = db.collection("users").doc(request.auth.uid);
+  const userGroupRef = userRef.collection("groups").doc(groupId);
 
   await db.runTransaction(async (transaction) => {
-    transaction.set(
-      groupRef,
-      {
-        name: groupId,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      {merge: true},
-    );
-    transaction.set(
+    const groupSnap = await transaction.get(groupRef);
+    const secretSnap = await transaction.get(secretRef);
+    const groupExists = groupSnap.exists;
+
+    if (!groupExists) {
+      throw new HttpsError("not-found", "Group was not found.");
+    }
+
+    const inviteCodeHash = secretSnap.data()?.inviteCodeHash;
+    if (!inviteCodeHash) {
+      throw new HttpsError("failed-precondition", "Group invite is not set.");
+    }
+
+    if (hashInviteCode(groupId, accessCode) !== inviteCodeHash) {
+      throw new HttpsError("permission-denied", "Invalid invite code.");
+    }
+
+    const groupName = groupSnap.data()?.name || groupId;
+    writeMembership(transaction, {
       memberRef,
-      {
-        uid: request.auth.uid,
-        role: "member",
-        joinedAt: FieldValue.serverTimestamp(),
-        lastSeenAt: FieldValue.serverTimestamp(),
-      },
-      {merge: true},
-    );
+      userRef,
+      userGroupRef,
+      auth: request.auth,
+      groupId,
+      name: groupName,
+      role: "member",
+    });
   });
 
   return {groupId, uid: request.auth.uid};
@@ -200,4 +252,77 @@ function cleanId(value) {
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .slice(0, 80);
+}
+
+function cleanName(value) {
+  return String(value || "").trim().slice(0, 80);
+}
+
+function cleanInviteCode(value) {
+  return String(value || "").trim().slice(0, 128);
+}
+
+function hashInviteCode(groupId, inviteCode) {
+  return crypto
+    .createHash("sha256")
+    .update(`${groupId}:${inviteCode}`)
+    .digest("hex");
+}
+
+async function uniqueGroupId(db, name) {
+  const prefix = cleanId(name).toLowerCase().slice(0, 24) || "group";
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const groupId = `${prefix}-${crypto.randomBytes(3).toString("hex")}`;
+    const existing = await db.collection("groups").doc(groupId).get();
+    if (!existing.exists) return groupId;
+  }
+  throw new HttpsError("aborted", "Could not allocate a group id.");
+}
+
+function writeMembership(transaction, params) {
+  const {
+    memberRef,
+    userRef,
+    userGroupRef,
+    auth,
+    groupId,
+    name,
+    role,
+  } = params;
+  const email = auth.token.email || "";
+  const displayName = auth.token.name || email.split("@")[0] || "User";
+  transaction.set(
+    userRef,
+    {
+      uid: auth.uid,
+      email,
+      displayName,
+      lastActiveGroupId: groupId,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+  transaction.set(
+    memberRef,
+    {
+      uid: auth.uid,
+      email,
+      displayName,
+      role,
+      joinedAt: FieldValue.serverTimestamp(),
+      lastSeenAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+  transaction.set(
+    userGroupRef,
+    {
+      groupId,
+      name,
+      role,
+      joinedAt: FieldValue.serverTimestamp(),
+      lastSeenAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
 }

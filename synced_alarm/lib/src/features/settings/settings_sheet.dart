@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/app_providers.dart';
+import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
+import '../../models/account.dart';
+import '../account/auth_screen.dart';
+import '../account/group_setup_screen.dart';
 
 Future<void> showSettingsSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -28,7 +33,7 @@ class SettingsSheet extends StatelessWidget {
   }
 }
 
-class SettingsPanel extends StatelessWidget {
+class SettingsPanel extends ConsumerWidget {
   const SettingsPanel({
     super.key,
     this.showHandle = false,
@@ -39,7 +44,11 @@ class SettingsPanel extends StatelessWidget {
   final bool showTitle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider).value;
+    final activeGroup = ref.watch(activeGroupProvider);
+    final signedIn = ref.watch(authStateProvider).value != null;
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -52,7 +61,7 @@ class SettingsPanel extends StatelessWidget {
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: SereneWakeColors.outline,
+                    color: Theme.of(context).colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -61,52 +70,78 @@ class SettingsPanel extends StatelessWidget {
             ],
             if (showTitle) ...[
               Text(
-                'Settings',
+                l10n.settings,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: SereneWakeColors.text,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
             ],
-            const _ProfileHeader(),
+            _ProfileHeader(profile: profile, activeGroup: activeGroup),
             const SizedBox(height: AppSpacing.lg),
-            const _SettingsSectionLabel('SYNC & ACCOUNT'),
-            _SettingsCard(
-              icon: Icons.cloud_sync_outlined,
-              title: 'Cloud Synchronization',
-              value: useFirebase ? 'Active' : 'Local demo',
-              detail: useFirebase
-                  ? 'Auth, Firestore, Functions, and FCM are active.'
-                  : 'Enable Firebase with dart-define after FlutterFire setup.',
-              trailing: Switch(value: useFirebase, onChanged: null),
-            ),
-            _SettingsCard(
-              icon: Icons.devices_other_rounded,
-              title: 'Shared group',
-              value: defaultGroupId,
-              detail: 'Access code comes from dart-define or demo defaults.',
-            ),
-            const _SettingsSectionLabel('ALARM DEFAULTS'),
-            const _SettingsCard(
-              icon: Icons.snooze_rounded,
-              title: 'Snooze Duration',
-              value: '5 mins',
-              detail: 'Used when a ringing alarm is snoozed.',
-            ),
-            const _SettingsCard(
-              icon: Icons.notifications_active_outlined,
-              title: 'Notification scope',
-              value: 'Android / Web FCM',
-              detail: 'Windows and Linux sync through Firestore while running.',
-            ),
-            const _SettingsSectionLabel('APPEARANCE'),
-            const _SettingsCard(
-              icon: Icons.palette_outlined,
-              title: 'Design reference',
-              value: 'Stitch Alarm App',
-              detail: 'Project 15792280768664650353 provides the UI baseline.',
+            _SettingsSectionLabel(l10n.syncAccount),
+            _SettingsGroup(
+              children: [
+                if (!useFirebase)
+                  _SettingsRow(
+                    title: l10n.account,
+                    value: l10n.localOnly,
+                    detail: l10n.firebaseModeDisabled,
+                  )
+                else if (!signedIn)
+                  _SettingsRow(
+                    title: l10n.account,
+                    value: l10n.localMode,
+                    detail: l10n.signInToSync,
+                    trailing: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AuthScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(l10n.signIn),
+                    ),
+                  )
+                else
+                  _SettingsRow(
+                    title: l10n.account,
+                    value: profile?.email ?? l10n.active,
+                    trailing: TextButton(
+                      onPressed: () {
+                        ref.read(accountRepositoryProvider).signOut();
+                      },
+                      child: Text(l10n.signOut),
+                    ),
+                  ),
+                if (useFirebase && signedIn) ...[
+                  const Divider(height: 1),
+                  _SettingsRow(
+                    title: l10n.sharedGroup,
+                    value: activeGroup?.name ?? l10n.noGroup,
+                    detail: activeGroup == null
+                        ? l10n.needGroupToSync
+                        : '${l10n.groupId}: ${activeGroup.groupId}',
+                  ),
+                  const Divider(height: 1),
+                  _SettingsRow(
+                    title: l10n.groupMgmt,
+                    value: l10n.createJoinSwitch,
+                    trailing: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const GroupSetupScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(l10n.open),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -116,41 +151,68 @@ class SettingsPanel extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader();
+  const _ProfileHeader({required this.profile, required this.activeGroup});
+
+  final AppUserProfile? profile;
+  final AlarmGroupSummary? activeGroup;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final l10n = AppLocalizations.of(context);
+    return Row(
       children: [
         Container(
-          width: 72,
-          height: 72,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: SereneWakeColors.primarySoft,
-            borderRadius: BorderRadius.circular(999),
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.alarm_rounded,
-            color: SereneWakeColors.primary,
-            size: 36,
+            color: Theme.of(context).colorScheme.primary,
+            size: 26,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'Demo Group',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: SereneWakeColors.text,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                activeGroup?.name ?? profile?.displayName ?? l10n.localAlarms,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                profile?.email ??
+                    activeGroup?.groupId ??
+                    l10n.noAccountRequired,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          'demo@synced-alarm.app',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: SereneWakeColors.mutedText),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(children: children),
     );
   }
 }
@@ -171,7 +233,7 @@ class _SettingsSectionLabel extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: SereneWakeColors.mutedText,
+          color: Theme.of(context).colorScheme.outline,
           fontWeight: FontWeight.w800,
           letterSpacing: 0,
         ),
@@ -180,77 +242,74 @@ class _SettingsSectionLabel extends StatelessWidget {
   }
 }
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.icon,
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
     required this.title,
     required this.value,
-    required this.detail,
+    this.detail,
     this.trailing,
   });
 
-  final IconData icon;
   final String title;
   final String value;
-  final String detail;
+  final String? detail;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: SereneWakeColors.primarySoft,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: SereneWakeColors.primary),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: SereneWakeColors.mutedText,
-                      fontWeight: FontWeight.w700,
-                    ),
+    final detailText = detail;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: detailText == null
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: SereneWakeColors.text,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                ),
+                if (detailText != null) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    detail,
+                    detailText,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: SereneWakeColors.mutedText,
-                      height: 1.35,
+                      color: Theme.of(context).colorScheme.outline,
+                      height: 1.3,
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: AppSpacing.sm),
-              trailing!,
-            ],
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Align(
+              alignment: detailText == null
+                  ? Alignment.center
+                  : Alignment.topCenter,
+              child: trailing!,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

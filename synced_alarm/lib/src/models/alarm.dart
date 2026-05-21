@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
+const defaultAlarmRepeatWeekdays = <int>{
+  DateTime.monday,
+  DateTime.tuesday,
+  DateTime.wednesday,
+  DateTime.thursday,
+  DateTime.friday,
+  DateTime.saturday,
+  DateTime.sunday,
+};
+const defaultAlarmRingDurationMinutes = 5;
+const defaultAlarmSnoozeMinutes = 5;
+const defaultAlarmMaxSnoozeCount = 3;
 
 enum AlarmCommandType { ring, dismiss, snooze }
 
@@ -14,6 +26,13 @@ class Alarm {
     required this.enabled,
     required this.createdAt,
     required this.updatedAt,
+    this.repeatWeekdays = defaultAlarmRepeatWeekdays,
+    this.ringDurationMinutes = defaultAlarmRingDurationMinutes,
+    this.soundEnabled = true,
+    this.vibrationEnabled = true,
+    this.snoozeMinutes = defaultAlarmSnoozeMinutes,
+    this.maxSnoozeCount = defaultAlarmMaxSnoozeCount,
+    this.snoozeCount = 0,
     this.snoozeUntil,
     this.lastTriggeredDate,
     this.updatedBy,
@@ -24,6 +43,12 @@ class Alarm {
     required String groupId,
     required String label,
     required TimeOfDay time,
+    Set<int> repeatWeekdays = defaultAlarmRepeatWeekdays,
+    int ringDurationMinutes = defaultAlarmRingDurationMinutes,
+    bool soundEnabled = true,
+    bool vibrationEnabled = true,
+    int snoozeMinutes = defaultAlarmSnoozeMinutes,
+    int maxSnoozeCount = defaultAlarmMaxSnoozeCount,
     String? updatedBy,
   }) {
     final now = DateTime.now();
@@ -35,6 +60,12 @@ class Alarm {
       enabled: true,
       createdAt: now,
       updatedAt: now,
+      repeatWeekdays: _normalizeRepeatWeekdays(repeatWeekdays),
+      ringDurationMinutes: ringDurationMinutes,
+      soundEnabled: soundEnabled,
+      vibrationEnabled: vibrationEnabled,
+      snoozeMinutes: snoozeMinutes,
+      maxSnoozeCount: maxSnoozeCount,
       updatedBy: updatedBy,
     );
   }
@@ -46,6 +77,28 @@ class Alarm {
       label: json['label'] as String? ?? 'Alarm',
       timeOfDayMinutes: json['timeOfDayMinutes'] as int? ?? 420,
       enabled: json['enabled'] as bool? ?? true,
+      repeatWeekdays: _repeatWeekdaysFromJson(json['repeatWeekdays']),
+      ringDurationMinutes: _boundedInt(
+        json['ringDurationMinutes'],
+        defaultAlarmRingDurationMinutes,
+        min: 1,
+        max: 60,
+      ),
+      soundEnabled: json['soundEnabled'] as bool? ?? true,
+      vibrationEnabled: json['vibrationEnabled'] as bool? ?? true,
+      snoozeMinutes: _boundedInt(
+        json['snoozeMinutes'],
+        defaultAlarmSnoozeMinutes,
+        min: 1,
+        max: 120,
+      ),
+      maxSnoozeCount: _boundedInt(
+        json['maxSnoozeCount'],
+        defaultAlarmMaxSnoozeCount,
+        min: 0,
+        max: 10,
+      ),
+      snoozeCount: _boundedInt(json['snoozeCount'], 0, min: 0, max: 10),
       snoozeUntil: _dateFromJson(json['snoozeUntil']),
       lastTriggeredDate: _dateFromJson(json['lastTriggeredDate']),
       createdAt: _dateFromJson(json['createdAt']) ?? DateTime.now(),
@@ -60,6 +113,13 @@ class Alarm {
   final String label;
   final int timeOfDayMinutes;
   final bool enabled;
+  final Set<int> repeatWeekdays;
+  final int ringDurationMinutes;
+  final bool soundEnabled;
+  final bool vibrationEnabled;
+  final int snoozeMinutes;
+  final int maxSnoozeCount;
+  final int snoozeCount;
   final DateTime? snoozeUntil;
   final DateTime? lastTriggeredDate;
   final DateTime createdAt;
@@ -83,13 +143,15 @@ class Alarm {
       timeOfDay.hour,
       timeOfDay.minute,
     );
-    final scheduled = today.isAfter(base)
-        ? today
-        : today.add(const Duration(days: 1));
     if (snoozeUntil != null && snoozeUntil!.isAfter(base)) {
       return snoozeUntil!;
     }
-    return scheduled;
+    for (var dayOffset = 0; dayOffset <= 7; dayOffset++) {
+      final candidate = today.add(Duration(days: dayOffset));
+      if (!candidate.isAfter(base)) continue;
+      if (repeatWeekdays.contains(candidate.weekday)) return candidate;
+    }
+    return today.add(const Duration(days: 1));
   }
 
   String get timeLabel {
@@ -105,6 +167,13 @@ class Alarm {
       'label': label,
       'timeOfDayMinutes': timeOfDayMinutes,
       'enabled': enabled,
+      'repeatWeekdays': repeatWeekdays.toList()..sort(),
+      'ringDurationMinutes': ringDurationMinutes,
+      'soundEnabled': soundEnabled,
+      'vibrationEnabled': vibrationEnabled,
+      'snoozeMinutes': snoozeMinutes,
+      'maxSnoozeCount': maxSnoozeCount,
+      'snoozeCount': snoozeCount,
       'snoozeUntil': snoozeUntil?.toIso8601String(),
       'lastTriggeredDate': lastTriggeredDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
@@ -118,6 +187,13 @@ class Alarm {
     String? label,
     int? timeOfDayMinutes,
     bool? enabled,
+    Set<int>? repeatWeekdays,
+    int? ringDurationMinutes,
+    bool? soundEnabled,
+    bool? vibrationEnabled,
+    int? snoozeMinutes,
+    int? maxSnoozeCount,
+    int? snoozeCount,
     DateTime? snoozeUntil,
     bool clearSnooze = false,
     DateTime? lastTriggeredDate,
@@ -131,6 +207,15 @@ class Alarm {
       label: label ?? this.label,
       timeOfDayMinutes: timeOfDayMinutes ?? this.timeOfDayMinutes,
       enabled: enabled ?? this.enabled,
+      repeatWeekdays: _normalizeRepeatWeekdays(
+        repeatWeekdays ?? this.repeatWeekdays,
+      ),
+      ringDurationMinutes: ringDurationMinutes ?? this.ringDurationMinutes,
+      soundEnabled: soundEnabled ?? this.soundEnabled,
+      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
+      maxSnoozeCount: maxSnoozeCount ?? this.maxSnoozeCount,
+      snoozeCount: clearSnooze ? 0 : snoozeCount ?? this.snoozeCount,
       snoozeUntil: clearSnooze ? null : snoozeUntil ?? this.snoozeUntil,
       lastTriggeredDate: lastTriggeredDate ?? this.lastTriggeredDate,
       createdAt: createdAt,
@@ -139,6 +224,34 @@ class Alarm {
       revision: revision ?? this.revision + 1,
     );
   }
+}
+
+Set<int> _repeatWeekdaysFromJson(Object? value) {
+  if (value is Iterable) {
+    return _normalizeRepeatWeekdays(value.whereType<int>().toSet());
+  }
+  return defaultAlarmRepeatWeekdays;
+}
+
+Set<int> _normalizeRepeatWeekdays(Set<int> value) {
+  final normalized = value
+      .where((weekday) => weekday >= DateTime.monday)
+      .where((weekday) => weekday <= DateTime.sunday)
+      .toSet();
+  if (normalized.isEmpty) return defaultAlarmRepeatWeekdays;
+  return Set.unmodifiable(normalized);
+}
+
+int _boundedInt(
+  Object? value,
+  int fallback, {
+  required int min,
+  required int max,
+}) {
+  final parsed = value is int ? value : fallback;
+  if (parsed < min) return min;
+  if (parsed > max) return max;
+  return parsed;
 }
 
 class AlarmCommand {

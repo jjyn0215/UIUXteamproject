@@ -13,12 +13,12 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../firebase_options.dart';
 import '../models/alarm.dart';
 
-const alarmNotificationChannelId = 'synced_alarm_ringing_v2';
+const alarmNotificationChannelId = 'synced_alarm_ringing_v3_sound_vibration';
 const alarmSyncNotificationChannelId = 'synced_alarm_sync_v1';
 const alarmNotificationSoundRepeatFlag = 4;
 const alarmNotificationDismissActionId = 'alarm_action_dismiss';
 const alarmNotificationSnoozeActionId = 'alarm_action_snooze';
-const alarmSnoozeDuration = Duration(minutes: 5);
+const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v3';
 
 const alarmNotificationActions = <AndroidNotificationAction>[
   AndroidNotificationAction(alarmNotificationSnoozeActionId, 'Snooze'),
@@ -38,6 +38,24 @@ const _ringingChannel = AndroidNotificationChannel(
   enableVibration: true,
   audioAttributesUsage: AudioAttributesUsage.alarm,
 );
+
+String alarmNotificationChannelIdFor(Alarm alarm) {
+  final sound = alarm.soundEnabled ? 'sound' : 'silent';
+  final vibration = alarm.vibrationEnabled ? 'vibration' : 'steady';
+  return '${_alarmNotificationChannelPrefix}_${sound}_$vibration';
+}
+
+AndroidNotificationChannel alarmNotificationChannelFor(Alarm alarm) {
+  return AndroidNotificationChannel(
+    alarmNotificationChannelIdFor(alarm),
+    'Synced Alarm Ringing',
+    description: 'Scheduled alarm notifications with per-alarm alert settings.',
+    importance: Importance.max,
+    playSound: alarm.soundEnabled,
+    enableVibration: alarm.vibrationEnabled,
+    audioAttributesUsage: AudioAttributesUsage.alarm,
+  );
+}
 
 const _syncChannel = AndroidNotificationChannel(
   alarmSyncNotificationChannelId,
@@ -185,14 +203,17 @@ class AlarmNotificationService {
     _messagingInitialized = true;
   }
 
-  Future<void> showAlarm(Alarm alarm) {
+  Future<void> showAlarm(Alarm alarm) async {
     final payload = AlarmNotificationPayload.fromAlarm(alarm);
-    return showNotification(
+    final details = _ringingNotificationDetailsFor(alarm);
+    await initializeLocalNotifications();
+    await _createRingingChannelFor(alarm);
+    return _notifications.show(
       id: payload.id,
       title: payload.title,
       body: payload.body,
+      notificationDetails: details,
       payload: payload.payload,
-      notificationDetails: _ringingNotificationDetails,
     );
   }
 
@@ -213,22 +234,27 @@ class AlarmNotificationService {
       await initializeLocalNotifications();
     }
     await _initializeTimeZone();
-    final request = AlarmNotificationRequest.fromAlarm(alarm);
+    await cancelAlarm(alarm);
+    await _createRingingChannelFor(alarm);
+    final requests = AlarmNotificationRequest.scheduledRequestsFromAlarm(alarm);
     final exactAllowed = await _canScheduleExactAlarms(
       requestPermission: requestExactPermission,
     );
-    await _notifications.zonedSchedule(
-      id: request.id,
-      title: request.title,
-      body: request.body,
-      scheduledDate: tz.TZDateTime.from(request.scheduledAt, tz.local),
-      notificationDetails: _ringingNotificationDetails,
-      androidScheduleMode: exactAllowed
-          ? AndroidScheduleMode.exactAllowWhileIdle
-          : AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: request.matchDateTimeComponents,
-      payload: request.payload,
-    );
+    final details = _ringingNotificationDetailsFor(alarm);
+    for (final request in requests) {
+      await _notifications.zonedSchedule(
+        id: request.id,
+        title: request.title,
+        body: request.body,
+        scheduledDate: tz.TZDateTime.from(request.scheduledAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: exactAllowed
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: request.matchDateTimeComponents,
+        payload: request.payload,
+      );
+    }
   }
 
   Future<void> cancelAlarm(Alarm alarm) {
@@ -246,6 +272,28 @@ class AlarmNotificationService {
       await initializeLocalNotifications();
     }
     await _notifications.cancel(id: alarmNotificationId(alarmId));
+    for (final weekday in defaultAlarmRepeatWeekdays) {
+      await _notifications.cancel(
+        id: alarmNotificationWeekdayId(alarmId, weekday),
+      );
+    }
+  }
+
+  Future<void> cancelAllAlarms({bool background = false}) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      if (background) {
+        await _initializeBackgroundLocalNotifications();
+      } else {
+        await initializeLocalNotifications();
+      }
+      await _notifications.cancelAll();
+    } on Object catch (error) {
+      if ('$error'.startsWith('LateInitializationError')) {
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> handleBackgroundNotificationResponse(
@@ -258,10 +306,19 @@ class AlarmNotificationService {
       case AlarmNotificationActionType.dismiss:
         await cancelAlarmById(action.alarmId, background: true);
       case AlarmNotificationActionType.snooze:
-        final alarm = action.payloadData.toAlarm(
-          snoozeUntil: DateTime.now().add(alarmSnoozeDuration),
+        final sourceAlarm = action.payloadData.toAlarm();
+        if (sourceAlarm == null) return;
+        if (sourceAlarm.maxSnoozeCount <= 0 ||
+            sourceAlarm.snoozeCount >= sourceAlarm.maxSnoozeCount) {
+          await cancelAlarmById(action.alarmId, background: true);
+          return;
+        }
+        final alarm = sourceAlarm.copyWith(
+          snoozeUntil: DateTime.now().add(
+            Duration(minutes: sourceAlarm.snoozeMinutes),
+          ),
+          snoozeCount: sourceAlarm.snoozeCount + 1,
         );
-        if (alarm == null) return;
         await cancelAlarmById(action.alarmId, background: true);
         await scheduleAlarm(alarm, background: true);
     }
@@ -359,19 +416,35 @@ class AlarmNotificationService {
     _alarmLaunchController.add(launch);
   }
 
-  NotificationDetails get _ringingNotificationDetails {
+  Future<void> _createRingingChannelFor(Alarm alarm) async {
+    final androidImplementation = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidImplementation?.createNotificationChannel(
+      alarmNotificationChannelFor(alarm),
+    );
+  }
+
+  NotificationDetails _ringingNotificationDetailsFor(Alarm alarm) {
+    final channel = alarmNotificationChannelFor(alarm);
+    final additionalFlags = alarm.soundEnabled
+        ? Int32List.fromList(<int>[alarmNotificationSoundRepeatFlag])
+        : null;
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        _ringingChannel.id,
-        _ringingChannel.name,
-        channelDescription: _ringingChannel.description,
+        channel.id,
+        channel.name,
+        channelDescription: channel.description,
         importance: Importance.max,
         priority: Priority.max,
         category: AndroidNotificationCategory.alarm,
+        playSound: alarm.soundEnabled,
+        enableVibration: alarm.vibrationEnabled,
+        silent: !alarm.soundEnabled && !alarm.vibrationEnabled,
         fullScreenIntent: true,
-        additionalFlags: Int32List.fromList(<int>[
-          alarmNotificationSoundRepeatFlag,
-        ]),
+        additionalFlags: additionalFlags,
+        timeoutAfter: alarm.ringDurationMinutes * 60 * 1000,
         ongoing: true,
         autoCancel: false,
         audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -494,6 +567,13 @@ class AlarmNotificationPayloadData {
     this.groupId,
     this.label,
     this.timeOfDayMinutes,
+    this.repeatWeekdays = defaultAlarmRepeatWeekdays,
+    this.ringDurationMinutes = defaultAlarmRingDurationMinutes,
+    this.soundEnabled = true,
+    this.vibrationEnabled = true,
+    this.snoozeMinutes = defaultAlarmSnoozeMinutes,
+    this.maxSnoozeCount = defaultAlarmMaxSnoozeCount,
+    this.snoozeCount = 0,
   });
 
   factory AlarmNotificationPayloadData.fromAlarm(Alarm alarm) {
@@ -502,6 +582,13 @@ class AlarmNotificationPayloadData {
       groupId: alarm.groupId,
       label: alarm.label,
       timeOfDayMinutes: alarm.timeOfDayMinutes,
+      repeatWeekdays: alarm.repeatWeekdays,
+      ringDurationMinutes: alarm.ringDurationMinutes,
+      soundEnabled: alarm.soundEnabled,
+      vibrationEnabled: alarm.vibrationEnabled,
+      snoozeMinutes: alarm.snoozeMinutes,
+      maxSnoozeCount: alarm.maxSnoozeCount,
+      snoozeCount: alarm.snoozeCount,
     );
   }
 
@@ -518,6 +605,17 @@ class AlarmNotificationPayloadData {
         groupId: decoded['groupId'] as String?,
         label: decoded['label'] as String?,
         timeOfDayMinutes: decoded['timeOfDayMinutes'] as int?,
+        repeatWeekdays: _payloadWeekdays(decoded['repeatWeekdays']),
+        ringDurationMinutes:
+            decoded['ringDurationMinutes'] as int? ??
+            defaultAlarmRingDurationMinutes,
+        soundEnabled: decoded['soundEnabled'] as bool? ?? true,
+        vibrationEnabled: decoded['vibrationEnabled'] as bool? ?? true,
+        snoozeMinutes:
+            decoded['snoozeMinutes'] as int? ?? defaultAlarmSnoozeMinutes,
+        maxSnoozeCount:
+            decoded['maxSnoozeCount'] as int? ?? defaultAlarmMaxSnoozeCount,
+        snoozeCount: decoded['snoozeCount'] as int? ?? 0,
       );
     } on Object {
       const alarmPayloadPrefix = 'alarm:';
@@ -532,6 +630,13 @@ class AlarmNotificationPayloadData {
   final String? groupId;
   final String? label;
   final int? timeOfDayMinutes;
+  final Set<int> repeatWeekdays;
+  final int ringDurationMinutes;
+  final bool soundEnabled;
+  final bool vibrationEnabled;
+  final int snoozeMinutes;
+  final int maxSnoozeCount;
+  final int snoozeCount;
 
   String encode() {
     return jsonEncode({
@@ -540,10 +645,17 @@ class AlarmNotificationPayloadData {
       if (groupId != null) 'groupId': groupId,
       if (label != null) 'label': label,
       if (timeOfDayMinutes != null) 'timeOfDayMinutes': timeOfDayMinutes,
+      'repeatWeekdays': repeatWeekdays.toList()..sort(),
+      'ringDurationMinutes': ringDurationMinutes,
+      'soundEnabled': soundEnabled,
+      'vibrationEnabled': vibrationEnabled,
+      'snoozeMinutes': snoozeMinutes,
+      'maxSnoozeCount': maxSnoozeCount,
+      'snoozeCount': snoozeCount,
     });
   }
 
-  Alarm? toAlarm({DateTime? snoozeUntil}) {
+  Alarm? toAlarm({DateTime? snoozeUntil, int? snoozeCount}) {
     final minutes = timeOfDayMinutes;
     if (minutes == null) return null;
     final now = DateTime.now();
@@ -553,11 +665,30 @@ class AlarmNotificationPayloadData {
       label: label?.trim().isEmpty ?? true ? 'Alarm' : label!.trim(),
       timeOfDayMinutes: minutes,
       enabled: true,
+      repeatWeekdays: repeatWeekdays,
+      ringDurationMinutes: ringDurationMinutes,
+      soundEnabled: soundEnabled,
+      vibrationEnabled: vibrationEnabled,
+      snoozeMinutes: snoozeMinutes,
+      maxSnoozeCount: maxSnoozeCount,
+      snoozeCount: snoozeCount ?? this.snoozeCount,
       snoozeUntil: snoozeUntil,
       createdAt: now,
       updatedAt: now,
     );
   }
+}
+
+Set<int> _payloadWeekdays(Object? value) {
+  if (value is Iterable) {
+    final weekdays = value
+        .whereType<int>()
+        .where((weekday) => weekday >= DateTime.monday)
+        .where((weekday) => weekday <= DateTime.sunday)
+        .toSet();
+    if (weekdays.isNotEmpty) return Set.unmodifiable(weekdays);
+  }
+  return defaultAlarmRepeatWeekdays;
 }
 
 class AlarmNotificationPayload {
@@ -647,12 +778,53 @@ class AlarmNotificationRequest {
     );
   }
 
+  static List<AlarmNotificationRequest> scheduledRequestsFromAlarm(
+    Alarm alarm, {
+    DateTime? from,
+  }) {
+    final base = from ?? DateTime.now();
+    if (alarm.snoozeUntil != null && alarm.snoozeUntil!.isAfter(base)) {
+      return [AlarmNotificationRequest.fromAlarm(alarm, from: base)];
+    }
+
+    final payload = AlarmNotificationPayload.fromAlarm(alarm);
+    final weekdays = alarm.repeatWeekdays.toList()..sort();
+    return [
+      for (final weekday in weekdays)
+        AlarmNotificationRequest(
+          id: alarmNotificationWeekdayId(alarm.id, weekday),
+          title: payload.title,
+          body: payload.body,
+          payload: payload.payload,
+          scheduledAt: _nextWeekdayOccurrence(alarm, weekday, base),
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        ),
+    ];
+  }
+
   final int id;
   final String title;
   final String body;
   final String? payload;
   final DateTime scheduledAt;
   final DateTimeComponents? matchDateTimeComponents;
+}
+
+DateTime _nextWeekdayOccurrence(Alarm alarm, int weekday, DateTime from) {
+  final todayAtAlarmTime = DateTime(
+    from.year,
+    from.month,
+    from.day,
+    alarm.timeOfDay.hour,
+    alarm.timeOfDay.minute,
+  );
+  for (var dayOffset = 0; dayOffset <= 7; dayOffset++) {
+    final candidate = todayAtAlarmTime.add(Duration(days: dayOffset));
+    if (candidate.weekday == weekday && candidate.isAfter(from)) {
+      return candidate;
+    }
+  }
+  return todayAtAlarmTime.add(const Duration(days: 7));
 }
 
 int alarmNotificationId(String alarmId) {
@@ -662,4 +834,8 @@ int alarmNotificationId(String alarmId) {
     hash = (hash * 0x01000193) & 0x7fffffff;
   }
   return hash == 0 ? 1 : hash;
+}
+
+int alarmNotificationWeekdayId(String alarmId, int weekday) {
+  return alarmNotificationId('$alarmId-weekday-$weekday');
 }

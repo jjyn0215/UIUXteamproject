@@ -25,13 +25,15 @@ DateTime? alarmDueTimeFor(Alarm alarm, DateTime now) {
       now.difference(alarm.snoozeUntil!).abs() < const Duration(minutes: 10)) {
     return alarm.snoozeUntil;
   }
-  return DateTime(
+  final dueAt = DateTime(
     now.year,
     now.month,
     now.day,
     alarm.timeOfDay.hour,
     alarm.timeOfDay.minute,
   );
+  if (!alarm.repeatWeekdays.contains(dueAt.weekday)) return null;
+  return dueAt;
 }
 
 String alarmDueTickKey(Alarm alarm, DateTime dueAt) {

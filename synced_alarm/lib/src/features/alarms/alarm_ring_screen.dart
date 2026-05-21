@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/alarm.dart';
 
@@ -24,6 +25,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: SereneWakeColors.primary,
       body: SafeArea(
@@ -82,7 +84,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
                         shape: const StadiumBorder(),
                       ),
                       icon: const Icon(Icons.snooze_rounded),
-                      label: const Text('Snooze'),
+                      label: Text(l10n.snooze),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -95,7 +97,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
                         minimumSize: const Size.fromHeight(58),
                       ),
                       icon: const Icon(Icons.check_rounded),
-                      label: const Text('Dismiss'),
+                      label: Text(l10n.dismiss),
                     ),
                   ),
                 ],

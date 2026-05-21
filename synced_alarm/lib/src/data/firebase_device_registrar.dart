@@ -30,13 +30,15 @@ class FirebaseDeviceRegistrar {
     String? webVapidKey,
   }) async {
     final user = await _ensureSignedIn();
-    await withFirebaseOperationTimeout(
-      _functions.httpsCallable('joinGroup').call<Map<String, Object?>>({
-        'groupId': groupId,
-        'accessCode': accessCode,
-      }),
-      operationName: 'join group',
-    );
+    if (accessCode.trim().isNotEmpty) {
+      await withFirebaseOperationTimeout(
+        _functions.httpsCallable('joinGroup').call<Map<String, Object?>>({
+          'groupId': groupId,
+          'accessCode': accessCode,
+        }),
+        operationName: 'join group',
+      );
+    }
 
     final token = await _fcmToken(webVapidKey: webVapidKey);
     final registration = DeviceRegistration(
@@ -63,11 +65,7 @@ class FirebaseDeviceRegistrar {
   Future<User> _ensureSignedIn() async {
     final currentUser = _auth.currentUser;
     if (currentUser != null) return currentUser;
-    final credential = await withFirebaseOperationTimeout(
-      _auth.signInAnonymously(),
-      operationName: 'anonymous sign-in',
-    );
-    return credential.user!;
+    throw StateError('Sign in before registering this device.');
   }
 
   Future<String?> _fcmToken({String? webVapidKey}) async {
