@@ -156,7 +156,7 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 - 알람 설정: 이름, 시간, 요일 반복, 울림 지속 시간, 소리 on/off, 진동 on/off, 스누즈 간격, 스누즈 횟수
 - Android 알림: 로컬 예약 알림, exact/inexact schedule, 요일별 반복 예약, 스누즈 1회 예약, 전용 ringing channel, full-screen intent, 잠금화면 표시/화면 켜기, 앱 시작 후 첫 예약 동기화 시 stale 예약 알림 전체 정리
 - 알람 제어: 앱 내부 `AlarmRingScreen`, 시스템 알림 `Dismiss`/`Snooze` 액션, background action callback, 액션 후 task 뒤로 보내기, 같은 tick 재울림 방지
-- Firebase 데이터 메시지: `alarm.created`, `alarm.updated`, `alarm.deleted`, `alarm.command`는 사용자 알림으로 띄우지 않고 silent sync 용도로 처리
+- Firebase 데이터 메시지: `alarm.created`, `alarm.updated`, `alarm.deleted`, `alarm.command` 수신 시 사용자 알림을 띄우지 않는 무소음(Silent Sync) 모드로 백그라운드에서 즉시 Firestore 데이터를 동기화하고 안드로이드 로컬 시스템 알람을 재스케줄링하도록 구현 완료
 
 ## 검증된 항목
 
