@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -327,6 +328,7 @@ class AlarmNotificationService {
   Future<void> showRemoteMessage(RemoteMessage message) async {
     if (message.notification == null &&
         !shouldShowRemoteDataNotification(message.data)) {
+      await _handleSilentSync(message);
       return;
     }
 
@@ -338,6 +340,63 @@ class AlarmNotificationService {
       payload: payload.payload,
       notificationDetails: _syncNotificationDetails,
     );
+  }
+
+  Future<void> _handleSilentSync(RemoteMessage message) async {
+    final data = message.data;
+    final type = data['type'];
+    final groupId = data['groupId'];
+    final alarmId = data['alarmId'];
+
+    if (groupId == null ||
+        alarmId == null ||
+        groupId.isEmpty ||
+        alarmId.isEmpty) {
+      return;
+    }
+
+    try {
+      if (type == 'alarm.created' || type == 'alarm.updated') {
+        final doc = await FirebaseFirestore.instance
+            .collection('groups')
+            .doc(groupId)
+            .collection('alarms')
+            .doc(alarmId)
+            .get();
+
+        if (doc.exists && doc.data() != null) {
+          final alarm = Alarm.fromJson(doc.id, {
+            ...doc.data()!,
+            'groupId': groupId,
+          });
+          await scheduleAlarm(alarm, background: true);
+        }
+      } else if (type == 'alarm.deleted') {
+        await cancelAlarmById(alarmId, background: true);
+      } else if (type == 'alarm.command') {
+        final commandType = data['commandType'];
+        if (commandType == 'dismiss') {
+          await cancelAlarmById(alarmId, background: true);
+        } else if (commandType == 'snooze') {
+          final doc = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(groupId)
+              .collection('alarms')
+              .doc(alarmId)
+              .get();
+
+          if (doc.exists && doc.data() != null) {
+            final alarm = Alarm.fromJson(doc.id, {
+              ...doc.data()!,
+              'groupId': groupId,
+            });
+            await scheduleAlarm(alarm, background: true);
+          }
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error during background silent sync: $e\n$stackTrace');
+    }
   }
 
   Future<void> showNotification({
