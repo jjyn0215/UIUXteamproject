@@ -84,7 +84,7 @@ void main() {
     expect(find.byTooltip('New alarm'), findsNothing);
   });
 
-  testWidgets('dismiss on ringing screen sends Android task to back', (
+  testWidgets('dismiss on ringing screen finishes alarm presentation', (
     WidgetTester tester,
   ) async {
     final alarm = Alarm(
@@ -109,14 +109,20 @@ void main() {
         _FakeAndroidLocalNotificationsPlugin();
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
-      await AlarmTaskController.moveTaskToBack();
-      expect(calls.map((call) => call.method), contains('moveTaskToBack'));
+      await AlarmTaskController.finishAlarmPresentation();
+      expect(
+        calls.map((call) => call.method),
+        contains('finishAlarmPresentation'),
+      );
       calls.clear();
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+            alarmListControllerProvider.overrideWith(
+              (ref) => _NoopAlarmListController(ref),
+            ),
             ringingAlarmProvider.overrideWith(
               () => _FixedRingingAlarmNotifier(alarm),
             ),
@@ -127,11 +133,23 @@ void main() {
       await tester.pump();
 
       expect(find.widgetWithText(FilledButton, 'Dismiss'), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Dismiss'));
+      final dismissButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Dismiss'),
+      );
+      expect(dismissButton.onPressed, isNotNull);
+      dismissButton.onPressed?.call();
       await tester.pumpAndSettle(const Duration(seconds: 1));
-      await tester.pump(const Duration(milliseconds: 100));
+      for (var i = 0; i < 20; i++) {
+        if (calls.any((call) => call.method == 'finishAlarmPresentation')) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      expect(calls.map((call) => call.method), contains('moveTaskToBack'));
+      expect(
+        calls.map((call) => call.method),
+        contains('finishAlarmPresentation'),
+      );
     } finally {
       debugDefaultTargetPlatformOverride = null;
       binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
@@ -146,6 +164,13 @@ class _FixedRingingAlarmNotifier extends RingingAlarmNotifier {
 
   @override
   Alarm? build() => alarm;
+}
+
+class _NoopAlarmListController extends AlarmListController {
+  _NoopAlarmListController(super.ref);
+
+  @override
+  Future<void> dismiss(Alarm alarm, {bool clearRingingAlarm = true}) async {}
 }
 
 class _FakeAndroidLocalNotificationsPlugin

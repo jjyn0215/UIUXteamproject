@@ -41,7 +41,9 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
     super.initState();
     final alarm = widget.alarm;
     _labelController = TextEditingController(text: alarm?.label ?? '');
-    _time = alarm?.timeOfDay ?? TimeOfDay.now();
+    final now = DateTime.now();
+    final oneMinuteLater = now.add(const Duration(minutes: 1));
+    _time = alarm?.timeOfDay ?? TimeOfDay.fromDateTime(oneMinuteLater);
     _repeatWeekdays = {
       ...(alarm?.repeatWeekdays ?? defaultAlarmRepeatWeekdays),
     };

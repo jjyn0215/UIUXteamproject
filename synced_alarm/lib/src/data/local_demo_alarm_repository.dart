@@ -15,15 +15,7 @@ class LocalDemoAlarmRepository implements AlarmRepository {
   List<Alarm> _alarms = const [];
   bool _loaded = false;
 
-  @override
-  Future<void> joinGroup({
-    required String groupId,
-    required String accessCode,
-  }) async {
-    if (groupId.trim().isEmpty || accessCode.trim().isEmpty) {
-      throw ArgumentError('groupId and accessCode are required.');
-    }
-  }
+
 
   @override
   Stream<List<Alarm>> watchAlarms({
@@ -33,7 +25,9 @@ class LocalDemoAlarmRepository implements AlarmRepository {
     await _ensureLoaded();
     yield _visibleAlarms(groupId);
     yield* _controller.stream.map((alarms) {
-      return alarms.where((alarm) => alarm.groupId == groupId).toList();
+      final list = alarms.where((alarm) => alarm.groupId == groupId).toList();
+      list.sort((a, b) => a.timeOfDayMinutes.compareTo(b.timeOfDayMinutes));
+      return list;
     });
   }
 

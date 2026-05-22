@@ -40,7 +40,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
       (_, next) {
         final alarms = next.value;
         if (alarms != null) {
-          _handlePendingAlarmAction(alarms);
+          unawaited(_handlePendingAlarmAction(alarms));
           _handlePendingAlarmLaunch(alarms);
           if (ref.read(ringingAlarmProvider) == null) {
             unawaited(
@@ -54,18 +54,20 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     _alarmLaunchSubscription = AlarmNotificationService.instance.alarmLaunches
         .listen(_handleAlarmLaunch);
     _alarmActionSubscription = AlarmNotificationService.instance.alarmActions
-        .listen(_handleAlarmAction);
+        .listen((action) {
+          unawaited(_handleAlarmAction(action));
+        });
     _timer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (mounted) {
-        setState(() {});
-        _ringDueAlarm();
+        if (_selectedTab == 0) {
+          setState(() {});
+        }
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _handlePendingAlarmAction();
+      unawaited(_handlePendingAlarmAction());
       _handlePendingAlarmLaunch();
-      _ringDueAlarm();
     });
   }
 
@@ -88,13 +90,17 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
       return AlarmRingScreen(
         alarm: ringingAlarm,
         onDismiss: () {
-          return _runAlarmScreenAction(() {
-            return ref.read(alarmListControllerProvider).dismiss(ringingAlarm);
+          return _runAlarmScreenAction(ringingAlarm, () {
+            return ref
+                .read(alarmListControllerProvider)
+                .dismiss(ringingAlarm, clearRingingAlarm: false);
           });
         },
         onSnooze: () {
-          return _runAlarmScreenAction(() {
-            return ref.read(alarmListControllerProvider).snooze(ringingAlarm);
+          return _runAlarmScreenAction(ringingAlarm, () {
+            return ref
+                .read(alarmListControllerProvider)
+                .snooze(ringingAlarm, clearRingingAlarm: false);
           });
         },
       );
@@ -191,21 +197,6 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     );
   }
 
-  void _ringDueAlarm() {
-    final alarms = ref.read(alarmsProvider).value;
-    if (alarms == null || ref.read(ringingAlarmProvider) != null) {
-      return;
-    }
-
-    final now = DateTime.now();
-    for (final alarm in alarms.where((alarm) => alarm.enabled)) {
-      if (_dueTickTracker.shouldRing(alarm, now)) {
-        unawaited(ref.read(alarmListControllerProvider).ring(alarm));
-        return;
-      }
-    }
-  }
-
   void _handleAlarmLaunch(AlarmNotificationLaunch launch) {
     final pendingLaunch =
         AlarmNotificationService.instance.consumePendingAlarmLaunch() ?? launch;
@@ -215,11 +206,12 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     }
   }
 
-  void _handleAlarmAction(AlarmNotificationActionRequest action) {
+  Future<void> _handleAlarmAction(AlarmNotificationActionRequest action) async {
     final pendingAction =
         AlarmNotificationService.instance.consumePendingAlarmAction() ?? action;
     final alarms = ref.read(alarmsProvider).value;
-    if (alarms == null || !_runAlarmNotificationAction(pendingAction, alarms)) {
+    if (alarms == null ||
+        !(await _runAlarmNotificationAction(pendingAction, alarms))) {
       _pendingAlarmAction = pendingAction;
     }
   }
@@ -238,7 +230,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     _showLaunchedAlarm(pendingAlarmId, availableAlarms);
   }
 
-  void _handlePendingAlarmAction([List<Alarm>? alarms]) {
+  Future<void> _handlePendingAlarmAction([List<Alarm>? alarms]) async {
     final initialAction = AlarmNotificationService.instance
         .consumePendingAlarmAction();
     if (initialAction != null) {
@@ -249,18 +241,18 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     if (pendingAction == null) return;
     final availableAlarms = alarms ?? ref.read(alarmsProvider).value;
     if (availableAlarms == null) return;
-    _runAlarmNotificationAction(pendingAction, availableAlarms);
+    await _runAlarmNotificationAction(pendingAction, availableAlarms);
   }
 
-  bool _runAlarmNotificationAction(
+  Future<bool> _runAlarmNotificationAction(
     AlarmNotificationActionRequest action,
     List<Alarm> alarms,
-  ) {
+  ) async {
     final alarm = _findAlarmById(alarms, action.alarmId);
     if (alarm == null) return false;
 
     _pendingAlarmAction = null;
-    _dueTickTracker.markHandled(alarm, DateTime.now());
+    await _dueTickTracker.markHandled(alarm, DateTime.now());
     final controller = ref.read(alarmListControllerProvider);
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
@@ -275,7 +267,12 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     final alarm = _findAlarmById(alarms, alarmId);
     if (alarm == null) return false;
     _pendingAlarmLaunchId = null;
-    _dueTickTracker.markHandled(alarm, DateTime.now());
+    unawaited(_dueTickTracker.markHandled(alarm, DateTime.now()));
+    unawaited(
+      AlarmNotificationService.instance.scheduleForegroundTriggersForAlarm(
+        alarm,
+      ),
+    );
     ref.read(ringingAlarmProvider.notifier).show(alarm);
     if (mounted && _selectedTab != 0) {
       setState(() => _selectedTab = 0);
@@ -290,11 +287,18 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     return null;
   }
 
-  Future<void> _runAlarmScreenAction(Future<void> Function() action) async {
+  Future<void> _runAlarmScreenAction(
+    Alarm alarm,
+    Future<void> Function() action,
+  ) async {
     try {
+      await _dueTickTracker.markHandled(alarm, DateTime.now());
       await action();
     } finally {
-      await AlarmTaskController.moveTaskToBack();
+      final finished = await AlarmTaskController.finishAlarmPresentation();
+      if (!finished) {
+        ref.read(ringingAlarmProvider.notifier).clear();
+      }
     }
   }
 }
@@ -511,7 +515,7 @@ class _NextAlarmCard extends StatelessWidget {
   }
 }
 
-class _AlarmCard extends StatefulWidget {
+class _AlarmCard extends ConsumerStatefulWidget {
   const _AlarmCard({
     required this.alarm,
     required this.now,
@@ -529,10 +533,10 @@ class _AlarmCard extends StatefulWidget {
   final Future<void> Function() onTestRing;
 
   @override
-  State<_AlarmCard> createState() => _AlarmCardState();
+  ConsumerState<_AlarmCard> createState() => _AlarmCardState();
 }
 
-class _AlarmCardState extends State<_AlarmCard> {
+class _AlarmCardState extends ConsumerState<_AlarmCard> {
   bool _busy = false;
 
   @override
@@ -650,11 +654,94 @@ class _AlarmCardState extends State<_AlarmCard> {
               ),
               const SizedBox(height: AppSpacing.sm),
               _DayChips(alarm: alarm),
+              if (alarm.enabled &&
+                  alarm.snoozeUntil != null &&
+                  alarm.snoozeUntil!.isAfter(widget.now)) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: SereneWakeColors.primary.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: SereneWakeColors.primary.withAlpha(50),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.snooze_rounded,
+                            size: 14,
+                            color: SereneWakeColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n.snoozingStatus(
+                              alarm.snoozeCount,
+                              alarm.maxSnoozeCount,
+                              _formatSnoozeTime(alarm.snoozeUntil!),
+                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: SereneWakeColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              setState(() => _busy = true);
+                              try {
+                                await ref
+                                    .read(alarmListControllerProvider)
+                                    .dismiss(alarm);
+                              } catch (error) {
+                                _showActionError(error);
+                              } finally {
+                                if (mounted) setState(() => _busy = false);
+                              }
+                            },
+                      icon: const Icon(Icons.alarm_off_rounded, size: 16),
+                      label: Text(l10n.dismissSnooze),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _formatSnoozeTime(DateTime dt) {
+    final hour = dt.hour;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = hour < 12 ? 'AM' : 'PM';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '$hour12:$minute $period';
   }
 
   Future<void> _confirmDelete(

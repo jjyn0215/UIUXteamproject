@@ -28,6 +28,27 @@ void main() {
     expect(shouldShowRemoteDataNotification({'type': 'system.notice'}), isTrue);
   });
 
+  test('does not cancel local schedules for alarm command sync data', () {
+    expect(
+      shouldCancelLocalScheduleForSilentSync({
+        'type': 'alarm.command',
+        'commandType': 'dismiss',
+      }),
+      isFalse,
+    );
+    expect(
+      shouldCancelLocalScheduleForSilentSync({
+        'type': 'alarm.command',
+        'commandType': 'snooze',
+      }),
+      isFalse,
+    );
+    expect(
+      shouldCancelLocalScheduleForSilentSync({'type': 'alarm.deleted'}),
+      isTrue,
+    );
+  });
+
   test('builds notification payload from alarm data', () {
     final alarm = Alarm(
       id: 'alarm-1',
@@ -142,6 +163,33 @@ void main() {
     );
   });
 
+  test('Android manifest registers the foreground alarm receiver', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    expect(manifest, contains('android:name=".ForegroundAlarmReceiver"'));
+  });
+
+  test(
+    'Android manifest routes full-screen alarms to a dedicated activity',
+    () {
+      final manifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+
+      expect(manifest, contains('android:name=".LaunchRouterActivity"'));
+      expect(manifest, contains('android:name=".AlarmActivity"'));
+      expect(manifest, contains('android:name=".MainActivity"'));
+      expect(
+        manifest,
+        contains('android:taskAffinity="com.teamproject.synced_alarm.alarm"'),
+      );
+      expect(manifest, contains('android:showWhenLocked="true"'));
+      expect(manifest, contains('android:turnScreenOn="true"'));
+    },
+  );
+
   test('builds scheduled alarm notification from next occurrence', () {
     final alarm = Alarm(
       id: 'alarm-1',
@@ -217,6 +265,38 @@ void main() {
       containsAll([DateTime(2026, 5, 18, 8), DateTime(2026, 5, 20, 8)]),
     );
     expect(requests.map((request) => request.id).toSet(), hasLength(2));
+  });
+
+  test('builds foreground alarm trigger arguments from scheduled requests', () {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Class',
+      timeOfDayMinutes: 8 * 60,
+      enabled: true,
+      repeatWeekdays: {DateTime.monday},
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final requests = AlarmNotificationRequest.scheduledRequestsFromAlarm(
+      alarm,
+      from: DateTime(2026, 5, 17, 9),
+    );
+
+    final args = foregroundAlarmTriggerArgumentsFromRequests(requests);
+
+    expect(args, hasLength(1));
+    expect(args.single['id'], alarmNotificationWeekdayId('alarm-1', 1));
+    expect(
+      args.single['triggerAtMillis'],
+      DateTime(2026, 5, 18, 8).millisecondsSinceEpoch,
+    );
+    expect(
+      AlarmNotificationPayloadData.fromPayload(
+        args.single['payload'] as String?,
+      )?.alarmId,
+      'alarm-1',
+    );
   });
 
   test('builds notification payload from command data', () {

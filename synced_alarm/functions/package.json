@@ -23,5 +23,8 @@
     "retry-request": "^8.0.2",
     "teeny-request": "^10.1.2",
     "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.18.0"
   }
 }

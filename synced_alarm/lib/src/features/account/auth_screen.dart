@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -186,8 +187,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = '$error';
+        _error = _mapFirebaseErrorMessage(error, l10n);
       });
     }
+  }
+
+  String _mapFirebaseErrorMessage(Object error, AppLocalizations l10n) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-email':
+          return l10n.errorAuthInvalidEmail;
+        case 'user-disabled':
+          return l10n.errorAuthUserDisabled;
+        case 'user-not-found':
+          return l10n.errorAuthUserNotFound;
+        case 'wrong-password':
+          return l10n.errorAuthWrongPassword;
+        case 'email-already-in-use':
+          return l10n.errorAuthEmailAlreadyInUse;
+        case 'weak-password':
+          return l10n.errorAuthWeakPassword;
+        case 'invalid-credential':
+          return l10n.errorAuthInvalidCredential;
+        default:
+          return error.message ?? l10n.errorAuthUnknown;
+      }
+    }
+    return error.toString();
   }
 }

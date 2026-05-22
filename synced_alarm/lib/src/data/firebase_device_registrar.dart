@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -11,34 +10,21 @@ class FirebaseDeviceRegistrar {
   FirebaseDeviceRegistrar({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
     FirebaseMessaging? messaging,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instance,
        _messaging = messaging ?? FirebaseMessaging.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
   final FirebaseMessaging _messaging;
 
   Future<DeviceRegistration> registerCurrentDevice({
     required String groupId,
-    required String accessCode,
     required String deviceId,
     String? webVapidKey,
   }) async {
     final user = await _ensureSignedIn();
-    if (accessCode.trim().isNotEmpty) {
-      await withFirebaseOperationTimeout(
-        _functions.httpsCallable('joinGroup').call<Map<String, Object?>>({
-          'groupId': groupId,
-          'accessCode': accessCode,
-        }),
-        operationName: 'join group',
-      );
-    }
 
     final token = await _fcmToken(webVapidKey: webVapidKey);
     final registration = DeviceRegistration(
@@ -52,12 +38,15 @@ class FirebaseDeviceRegistrar {
       lastSeenAt: DateTime.now(),
     );
 
-    await _firestore
-        .collection('groups')
-        .doc(groupId)
-        .collection('devices')
-        .doc(deviceId)
-        .set(registration.toJson(), SetOptions(merge: true));
+    await withFirebaseOperationTimeout(
+      _firestore
+          .collection('groups')
+          .doc(groupId)
+          .collection('devices')
+          .doc(deviceId)
+          .set(registration.toJson(), SetOptions(merge: true)),
+      operationName: 'register device',
+    );
 
     return registration;
   }

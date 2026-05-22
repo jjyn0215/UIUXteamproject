@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/alarm.dart';
@@ -10,30 +9,11 @@ class FirebaseAlarmRepository implements AlarmRepository {
   FirebaseAlarmRepository({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
   }) : _auth = auth ?? FirebaseAuth.instance,
-       _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instance;
+       _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
-
-  @override
-  Future<void> joinGroup({
-    required String groupId,
-    required String accessCode,
-  }) async {
-    _ensureSignedIn();
-    final callable = _functions.httpsCallable('joinGroup');
-    await withFirebaseOperationTimeout(
-      callable.call<Map<String, Object?>>({
-        'groupId': groupId,
-        'accessCode': accessCode,
-      }),
-      operationName: 'join group',
-    );
-  }
 
   @override
   Stream<List<Alarm>> watchAlarms({
@@ -55,10 +35,13 @@ class FirebaseAlarmRepository implements AlarmRepository {
   @override
   Future<void> upsertAlarm(Alarm alarm, {required String accessCode}) async {
     _ensureSignedIn();
-    await _group(alarm.groupId)
-        .collection('alarms')
-        .doc(alarm.id)
-        .set(alarm.toJson(), SetOptions(merge: true));
+    await withFirebaseOperationTimeout(
+      _group(alarm.groupId)
+          .collection('alarms')
+          .doc(alarm.id)
+          .set(alarm.toJson(), SetOptions(merge: true)),
+      operationName: 'upsert alarm',
+    );
   }
 
   @override
@@ -68,7 +51,10 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String accessCode,
   }) async {
     _ensureSignedIn();
-    await _group(groupId).collection('alarms').doc(alarmId).delete();
+    await withFirebaseOperationTimeout(
+      _group(groupId).collection('alarms').doc(alarmId).delete(),
+      operationName: 'delete alarm',
+    );
   }
 
   @override
@@ -79,12 +65,15 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String accessCode,
   }) async {
     _ensureSignedIn();
-    await _group(groupId).collection('alarms').doc(alarmId).set({
-      'enabled': enabled,
-      'updatedAt': DateTime.now().toIso8601String(),
-      'updatedBy': _auth.currentUser?.uid,
-      'revision': FieldValue.increment(1),
-    }, SetOptions(merge: true));
+    await withFirebaseOperationTimeout(
+      _group(groupId).collection('alarms').doc(alarmId).set({
+        'enabled': enabled,
+        'updatedAt': DateTime.now().toIso8601String(),
+        'updatedBy': _auth.currentUser?.uid,
+        'revision': FieldValue.increment(1),
+      }, SetOptions(merge: true)),
+      operationName: 'set alarm enabled',
+    );
   }
 
   @override
@@ -93,9 +82,12 @@ class FirebaseAlarmRepository implements AlarmRepository {
     required String accessCode,
   }) async {
     _ensureSignedIn();
-    await _group(
-      command.groupId,
-    ).collection('commands').doc(command.id).set(command.toJson());
+    await withFirebaseOperationTimeout(
+      _group(
+        command.groupId,
+      ).collection('commands').doc(command.id).set(command.toJson()),
+      operationName: 'send command',
+    );
   }
 
   DocumentReference<Map<String, dynamic>> _group(String groupId) {

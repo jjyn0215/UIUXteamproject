@@ -1,9 +1,13 @@
+import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -129,12 +133,23 @@ final cloudSyncEnabledProvider = Provider<bool>((ref) {
 
 final deviceIdProvider = FutureProvider<String>((ref) async {
   if (!useFirebase) return defaultDeviceId;
+
+  const secureStorage = FlutterSecureStorage();
+  final existingSecure = await secureStorage.read(key: _deviceIdPrefsKey);
+  if (existingSecure != null && existingSecure.isNotEmpty) {
+    return existingSecure;
+  }
+
   final prefs = await SharedPreferences.getInstance();
-  final existing = prefs.getString(_deviceIdPrefsKey);
-  if (existing != null && existing.isNotEmpty) return existing;
+  final existingPrefs = prefs.getString(_deviceIdPrefsKey);
+  if (existingPrefs != null && existingPrefs.isNotEmpty) {
+    await secureStorage.write(key: _deviceIdPrefsKey, value: existingPrefs);
+    await prefs.remove(_deviceIdPrefsKey);
+    return existingPrefs;
+  }
 
   final generated = _uuid.v4();
-  await prefs.setString(_deviceIdPrefsKey, generated);
+  await secureStorage.write(key: _deviceIdPrefsKey, value: generated);
   return generated;
 });
 
@@ -165,7 +180,6 @@ final deviceRegistrationProvider = FutureProvider<DeviceRegistration?>((
   final deviceId = await ref.watch(deviceIdProvider.future);
   return FirebaseDeviceRegistrar().registerCurrentDevice(
     groupId: activeGroup.groupId,
-    accessCode: '',
     deviceId: deviceId,
     webVapidKey: firebaseMessagingVapidKey.isEmpty
         ? null
@@ -319,7 +333,7 @@ class AlarmListController {
     final deviceId = await _deviceId();
     final updatedAlarm = alarm.copyWith(
       updatedBy: deviceId,
-      revision: alarm.revision,
+      revision: alarm.revision + 1,
     );
     await _repository.upsertAlarm(updatedAlarm, accessCode: '');
     await _syncSingleLocalAlarm(updatedAlarm, requestExactPermission: true);
@@ -337,6 +351,9 @@ class AlarmListController {
       alarm.copyWith(enabled: enabled),
       requestExactPermission: enabled,
     );
+    if (!enabled) {
+      await AlarmNotificationService.instance.cancelSnoozeNotification(alarm.id);
+    }
   }
 
   Future<void> deleteAlarm(Alarm alarm) async {
@@ -347,6 +364,7 @@ class AlarmListController {
       accessCode: '',
     );
     await _cancelLocalAlarm(alarm.id);
+    await AlarmNotificationService.instance.cancelSnoozeNotification(alarm.id);
   }
 
   Future<void> syncScheduledAlarms(List<Alarm> alarms) async {
@@ -369,6 +387,7 @@ class AlarmListController {
     final deviceId = await _deviceId();
     _ref.read(ringingAlarmProvider.notifier).show(alarm);
     await AlarmNotificationService.instance.showAlarm(alarm);
+    await AlarmNotificationService.instance.cancelSnoozeNotification(alarm.id);
     await _repository.sendCommand(
       AlarmCommand.create(
         groupId: alarm.groupId,
@@ -380,11 +399,14 @@ class AlarmListController {
     );
   }
 
-  Future<void> dismiss(Alarm alarm) async {
+  Future<void> dismiss(Alarm alarm, {bool clearRingingAlarm = true}) async {
     await _ensureReady();
     final deviceId = await _deviceId();
-    _ref.read(ringingAlarmProvider.notifier).clear();
+    if (clearRingingAlarm) {
+      _ref.read(ringingAlarmProvider.notifier).clear();
+    }
     await _cancelLocalAlarm(alarm.id);
+    await AlarmNotificationService.instance.cancelSnoozeNotification(alarm.id);
     if (alarm.enabled) {
       final dismissedAlarm = alarm.copyWith(
         clearSnooze: true,
@@ -405,15 +427,17 @@ class AlarmListController {
     );
   }
 
-  Future<void> snooze(Alarm alarm) async {
+  Future<void> snooze(Alarm alarm, {bool clearRingingAlarm = true}) async {
     await _ensureReady();
     if (alarm.maxSnoozeCount <= 0 ||
         alarm.snoozeCount >= alarm.maxSnoozeCount) {
-      await dismiss(alarm);
+      await dismiss(alarm, clearRingingAlarm: clearRingingAlarm);
       return;
     }
     final deviceId = await _deviceId();
-    _ref.read(ringingAlarmProvider.notifier).clear();
+    if (clearRingingAlarm) {
+      _ref.read(ringingAlarmProvider.notifier).clear();
+    }
     await _cancelLocalAlarm(alarm.id);
     final snoozedAlarm = alarm.copyWith(
       snoozeUntil: DateTime.now().add(Duration(minutes: alarm.snoozeMinutes)),
@@ -423,6 +447,7 @@ class AlarmListController {
     );
     await _repository.upsertAlarm(snoozedAlarm, accessCode: '');
     await _syncSingleLocalAlarm(snoozedAlarm);
+    await AlarmNotificationService.instance.showSnoozeNotification(snoozedAlarm);
     await _repository.sendCommand(
       AlarmCommand.create(
         groupId: alarm.groupId,
@@ -524,5 +549,111 @@ Future<void> ensureFirebaseInitialized() async {
       firebaseFunctionsEmulatorPort,
     );
     _firebaseEmulatorsConnected = true;
+  }
+}
+
+final permissionStateProvider = NotifierProvider<PermissionStateNotifier, AsyncValue<bool>>(
+  PermissionStateNotifier.new,
+);
+
+class PermissionStateNotifier extends Notifier<AsyncValue<bool>> {
+  @override
+  AsyncValue<bool> build() {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+      return const AsyncValue.data(true);
+    }
+    _checkPermissionsInitially();
+    return const AsyncValue.loading();
+  }
+
+  Future<void> _checkPermissionsInitially() async {
+    await checkPermissions();
+  }
+
+  Future<void> checkPermissions() async {
+    try {
+      if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+        state = const AsyncValue.data(true);
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeen = prefs.getBool('hasSeenPermissionGuide') ?? false;
+      if (!hasSeen) {
+        state = const AsyncValue.data(false);
+        return;
+      }
+
+      final notificationGranted = await Permission.notification.isGranted;
+      final exactAlarmGranted = await Permission.scheduleExactAlarm.isGranted;
+
+      state = AsyncValue.data(notificationGranted && exactAlarmGranted);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> completeGuide() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenPermissionGuide', true);
+    await checkPermissions();
+  }
+}
+
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
+);
+
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  static const _themePrefsKey = 'synced_alarm_theme_mode';
+
+  @override
+  ThemeMode build() {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+      return ThemeMode.system;
+    }
+    _loadThemeMode();
+    return ThemeMode.system;
+  }
+
+  Future<void> _loadThemeMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final themeStr = prefs.getString(_themePrefsKey) ?? 'system';
+      state = _parseThemeMode(themeStr);
+    } catch (_) {
+      state = ThemeMode.system;
+    }
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_themePrefsKey, _themeModeToString(mode));
+    } catch (_) {}
+  }
+
+  ThemeMode _parseThemeMode(String value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  String _themeModeToString(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
+    }
   }
 }

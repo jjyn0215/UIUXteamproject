@@ -89,6 +89,14 @@ class AppLocalizations {
       'error_enter_email_password':
           'Enter an email and a 6+ character password.',
       'error_enter_name': 'Enter a name for this account.',
+      'error_auth_invalid_email': 'Invalid email format.',
+      'error_auth_user_disabled': 'This account has been disabled.',
+      'error_auth_user_not_found': 'Account not found.',
+      'error_auth_wrong_password': 'Incorrect password.',
+      'error_auth_email_already_in_use': 'Email is already in use.',
+      'error_auth_weak_password': 'Password should be at least 6 characters.',
+      'error_auth_invalid_credential': 'Invalid email or password.',
+      'error_auth_unknown': 'Authentication error occurred. Please try again.',
       'alarm_group': 'Alarm Group',
       'create': 'Create',
       'join': 'Join',
@@ -108,6 +116,29 @@ class AppLocalizations {
       'open': 'Open',
       'local_alarms': 'Local alarms',
       'no_account_required': 'No account required',
+      'permission_title': 'Permission Guide',
+      'permission_subtitle': 'The following permissions are required to use the app properly.',
+      'permission_notify': 'Show Notifications (Required)',
+      'permission_notify_desc': 'Receive alarm ringing and real-time sync notifications.',
+      'permission_exact': 'Exact Alarms (Required)',
+      'permission_exact_desc': 'Ensures alarms ring precisely at the specified time.',
+      'permission_battery': 'Ignore Battery Optimizations (Recommended)',
+      'permission_battery_desc': 'Ensures alarms operate without delay in the background.',
+      'permission_grant': 'Configure',
+      'permission_granted': 'Allowed',
+      'permission_start': 'Get Started',
+      'permission_dialog_title': 'Notification Permission Required',
+      'permission_dialog_msg': 'Notification permission was denied. To ring alarms properly, you must allow notifications in system settings. Would you like to go to settings?',
+      'permission_dialog_permanently_msg': 'Notification permission is permanently denied. To receive alarms on time, please allow notifications in system settings. Would you like to go to settings?',
+      'permission_dialog_settings': 'Go to Settings',
+      'theme_setting': 'Theme Mode',
+      'theme_system': 'System Default',
+      'theme_light': 'Light Mode',
+      'theme_dark': 'Dark Mode',
+      'app_info': 'App Info',
+      'app_version': 'Version',
+      'general': 'GENERAL SETTINGS',
+      'dismiss_snooze': 'Dismiss Snooze',
     },
     'ko': {
       'app_title': '동기화 알람',
@@ -186,6 +217,14 @@ class AppLocalizations {
       'create_new_account': '새 계정 만들기',
       'error_enter_email_password': '이메일과 6자 이상의 비밀번호를 입력해주세요.',
       'error_enter_name': '이름을 입력해주세요.',
+      'error_auth_invalid_email': '유효하지 않은 이메일 형식입니다.',
+      'error_auth_user_disabled': '비활성화된 계정입니다.',
+      'error_auth_user_not_found': '등록되지 않은 계정입니다.',
+      'error_auth_wrong_password': '비밀번호가 잘못되었습니다.',
+      'error_auth_email_already_in_use': '이미 사용 중인 이메일 주소입니다.',
+      'error_auth_weak_password': '비밀번호는 최소 6자 이상이어야 합니다.',
+      'error_auth_invalid_credential': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'error_auth_unknown': '인증 오류가 발생했습니다. 다시 시도해주세요.',
       'alarm_group': '알람 그룹',
       'create': '생성',
       'join': '참가',
@@ -204,6 +243,29 @@ class AppLocalizations {
       'open': '열기',
       'local_alarms': '로컬 알람',
       'no_account_required': '계정 필요 없음',
+      'permission_title': '권한 가이드',
+      'permission_subtitle': '앱을 정상적으로 이용하기 위해 아래 권한들이 필요합니다.',
+      'permission_notify': '알림 표시 (필수)',
+      'permission_notify_desc': '알람 울림 및 실시간 동기화 알림을 수신합니다.',
+      'permission_exact': '정확한 알람 예약 (필수)',
+      'permission_exact_desc': '지정한 시간에 오차 없이 알람이 울리도록 합니다.',
+      'permission_battery': '배터리 최적화 제외 (권장)',
+      'permission_battery_desc': '백그라운드에서도 지연 없이 알람이 작동하도록 설정합니다.',
+      'permission_grant': '설정하기',
+      'permission_granted': '허용됨',
+      'permission_start': '시작하기',
+      'permission_dialog_title': '알림 권한 설정 필요',
+      'permission_dialog_msg': '알림 권한이 거부되었습니다. 앱에서 알람을 정상적으로 울리려면 시스템 설정에서 알림을 허용해야 합니다. 알림 설정 화면으로 이동하시겠습니까?',
+      'permission_dialog_permanently_msg': '알림 권한이 영구적으로 거부되었습니다. 정시에 알람을 받으려면 알림 설정 화면에서 알림을 허용해 주세요. 알림 설정 화면으로 이동하시겠습니까?',
+      'permission_dialog_settings': '설정으로 이동',
+      'theme_setting': '테마 설정',
+      'theme_system': '시스템 기본 설정',
+      'theme_light': '라이트 모드',
+      'theme_dark': '다크 모드',
+      'app_info': '앱 정보',
+      'app_version': '앱 버전',
+      'general': '일반 설정',
+      'dismiss_snooze': '스누즈 해제',
     },
   };
 
@@ -274,6 +336,14 @@ class AppLocalizations {
   String get createNewAccount => _getValue('create_new_account');
   String get errorEnterEmailPassword => _getValue('error_enter_email_password');
   String get errorEnterName => _getValue('error_enter_name');
+  String get errorAuthInvalidEmail => _getValue('error_auth_invalid_email');
+  String get errorAuthUserDisabled => _getValue('error_auth_user_disabled');
+  String get errorAuthUserNotFound => _getValue('error_auth_user_not_found');
+  String get errorAuthWrongPassword => _getValue('error_auth_wrong_password');
+  String get errorAuthEmailAlreadyInUse => _getValue('error_auth_email_already_in_use');
+  String get errorAuthWeakPassword => _getValue('error_auth_weak_password');
+  String get errorAuthInvalidCredential => _getValue('error_auth_invalid_credential');
+  String get errorAuthUnknown => _getValue('error_auth_unknown');
   String get alarmGroup => _getValue('alarm_group');
   String get create => _getValue('create');
   String get join => _getValue('join');
@@ -292,6 +362,28 @@ class AppLocalizations {
   String get open => _getValue('open');
   String get localAlarms => _getValue('local_alarms');
   String get noAccountRequired => _getValue('no_account_required');
+  String get permissionTitle => _getValue('permission_title');
+  String get permissionSubtitle => _getValue('permission_subtitle');
+  String get permissionNotify => _getValue('permission_notify');
+  String get permissionNotifyDesc => _getValue('permission_notify_desc');
+  String get permissionExact => _getValue('permission_exact');
+  String get permissionExactDesc => _getValue('permission_exact_desc');
+  String get permissionBattery => _getValue('permission_battery');
+  String get permissionBatteryDesc => _getValue('permission_battery_desc');
+  String get permissionGrant => _getValue('permission_grant');
+  String get permissionGranted => _getValue('permission_granted');
+  String get permissionStart => _getValue('permission_start');
+  String get permissionDialogTitle => _getValue('permission_dialog_title');
+  String get permissionDialogMsg => _getValue('permission_dialog_msg');
+  String get permissionDialogPermanentlyMsg => _getValue('permission_dialog_permanently_msg');
+  String get permissionDialogSettings => _getValue('permission_dialog_settings');
+  String get themeSetting => _getValue('theme_setting');
+  String get themeSystem => _getValue('theme_system');
+  String get themeLight => _getValue('theme_light');
+  String get themeDark => _getValue('theme_dark');
+  String get appInfo => _getValue('app_info');
+  String get appVersion => _getValue('app_version');
+  String get general => _getValue('general');
 
   String get mon => _getValue('mon');
   String get tue => _getValue('tue');
@@ -303,6 +395,15 @@ class AppLocalizations {
 
   String ringsIn(String duration) => '${_getValue('rings_in')} $duration';
   String startsIn(String duration) => '${_getValue('starts_in')} $duration';
+
+  String snoozingStatus(int count, int max, String time) {
+    if (locale.languageCode == 'ko') {
+      return '스누즈 중 ($count/$max) · $time 다시 울림';
+    }
+    return 'Snoozing ($count/$max) · Rings again at $time';
+  }
+
+  String get dismissSnooze => _getValue('dismiss_snooze');
 
   String _getValue(String key) {
     return _localizedValues[locale.languageCode]?[key] ??

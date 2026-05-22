@@ -72,7 +72,12 @@ service cloud.firestore {
         && request.resource.data.snoozeCount is int
         && request.resource.data.snoozeCount >= 0
         && request.resource.data.snoozeCount <= 10
-        && request.resource.data.revision is int;
+        && request.resource.data.revision is int
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && (request.resource.data.updatedBy == null || request.resource.data.updatedBy is string)
+        && (request.resource.data.snoozeUntil == null || request.resource.data.snoozeUntil is string)
+        && (request.resource.data.lastTriggeredDate == null || request.resource.data.lastTriggeredDate is string);
     }
 
     function validCommand(groupId) {
@@ -124,7 +129,9 @@ service cloud.firestore {
 
       match /devices/{deviceId} {
         allow read: if isGroupMember(groupId);
-        allow create, update: if isGroupMember(groupId) && validDevice(groupId);
+        allow create: if isGroupMember(groupId) && validDevice(groupId);
+        allow update: if isGroupMember(groupId) && validDevice(groupId)
+          && resource.data.uid == request.auth.uid;
         allow delete: if isGroupMember(groupId)
           && resource.data.uid == request.auth.uid;
       }

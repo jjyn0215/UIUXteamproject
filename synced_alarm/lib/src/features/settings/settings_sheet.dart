@@ -143,6 +143,23 @@ class SettingsPanel extends ConsumerWidget {
                 ],
               ],
             ),
+            const SizedBox(height: AppSpacing.lg),
+            _SettingsSectionLabel(l10n.general),
+            const _SettingsGroup(
+              children: [
+                _ThemeSettingsRow(),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _SettingsSectionLabel(l10n.appInfo),
+            _SettingsGroup(
+              children: [
+                _SettingsRow(
+                  title: l10n.appVersion,
+                  value: '1.0.0+1',
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -312,5 +329,94 @@ class _SettingsRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ThemeSettingsRow extends ConsumerWidget {
+  const _ThemeSettingsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final l10n = AppLocalizations.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.themeSetting,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _getThemeName(themeMode, l10n),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<ThemeMode>(
+              value: themeMode,
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              onChanged: (ThemeMode? newMode) {
+                if (newMode != null) {
+                  ref.read(themeModeProvider.notifier).setThemeMode(newMode);
+                }
+              },
+              items: [
+                DropdownMenuItem(
+                  value: ThemeMode.system,
+                  child: Text(l10n.themeSystem),
+                ),
+                DropdownMenuItem(
+                  value: ThemeMode.light,
+                  child: Text(l10n.themeLight),
+                ),
+                DropdownMenuItem(
+                  value: ThemeMode.dark,
+                  child: Text(l10n.themeDark),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getThemeName(ThemeMode mode, AppLocalizations l10n) {
+    switch (mode) {
+      case ThemeMode.system:
+        return l10n.themeSystem;
+      case ThemeMode.light:
+        return l10n.themeLight;
+      case ThemeMode.dark:
+        return l10n.themeDark;
+    }
   }
 }

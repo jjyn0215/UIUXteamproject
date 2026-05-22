@@ -1,0 +1,160 @@
+package com.teamproject.synced_alarm
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+open class SyncedAlarmFlutterActivity : FlutterActivity() {
+    private val alarmTaskChannel = "com.teamproject.synced_alarm/alarm_task"
+    private val alarmTriggerChannelName = "com.teamproject.synced_alarm/alarm_trigger"
+    private val alarmSchedulerChannelName = "com.teamproject.synced_alarm/alarm_scheduler"
+    private var alarmTriggerChannel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleAlarmTriggerIntent(intent)
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            alarmTaskChannel,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "moveTaskToBack" -> {
+                    moveTaskToBack(true)
+                    result.success(true)
+                }
+                "finishAlarmPresentation" -> {
+                    result.success(finishAlarmPresentation())
+                }
+                "openNotificationSettings" -> {
+                    val intent = Intent().apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        } else {
+                            action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                            data = Uri.fromParts("package", packageName, null)
+                        }
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    try {
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Could not open notification settings", e.message)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            alarmTriggerChannelName,
+        ).also { channel ->
+            alarmTriggerChannel = channel
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "consumePendingAlarmTrigger" -> {
+                        result.success(consumePendingAlarmTriggerPayload())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            alarmSchedulerChannelName,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "scheduleForegroundTriggers" -> {
+                    ForegroundAlarmScheduler.schedule(this, call.arguments)
+                    result.success(true)
+                }
+                "cancelForegroundTriggers" -> {
+                    ForegroundAlarmScheduler.cancel(this, call.arguments)
+                    result.success(true)
+                }
+                "cancelAllForegroundTriggers" -> {
+                    ForegroundAlarmScheduler.cancelAll(this)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumedActivityName = javaClass.name
+    }
+
+    override fun onPause() {
+        if (resumedActivityName == javaClass.name) {
+            resumedActivityName = null
+        }
+        super.onPause()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAlarmTriggerIntent(intent)
+    }
+
+    protected open fun finishAlarmPresentation(): Boolean {
+        return false
+    }
+
+    private fun handleAlarmTriggerIntent(source: Intent?) {
+        if (source?.action != ACTION_ALARM_TRIGGER) return
+        val payload = source.getStringExtra(EXTRA_ALARM_PAYLOAD)
+        if (payload.isNullOrBlank()) return
+        pendingAlarmTriggerPayload = payload
+        alarmTriggerChannel?.invokeMethod(
+            "alarmTriggered",
+            payload,
+            object : MethodChannel.Result {
+                override fun success(result: Any?) {
+                    if (pendingAlarmTriggerPayload == payload) {
+                        pendingAlarmTriggerPayload = null
+                    }
+                }
+
+                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) = Unit
+
+                override fun notImplemented() = Unit
+            },
+        )
+    }
+
+    companion object {
+        const val ACTION_ALARM_TRIGGER = "com.teamproject.synced_alarm.ALARM_TRIGGER"
+        const val ACTION_FOREGROUND_ALARM_TRIGGER =
+            "com.teamproject.synced_alarm.FOREGROUND_ALARM_TRIGGER"
+        const val EXTRA_ALARM_PAYLOAD = "alarm_payload"
+
+        @Volatile
+        private var resumedActivityName: String? = null
+
+        @Volatile
+        private var pendingAlarmTriggerPayload: String? = null
+
+        fun shouldRouteForegroundAlarmToFlutter(): Boolean {
+            return resumedActivityName == MainActivity::class.java.name
+        }
+
+        private fun consumePendingAlarmTriggerPayload(): String? {
+            val payload = pendingAlarmTriggerPayload
+            pendingAlarmTriggerPayload = null
+            return payload
+        }
+    }
+}

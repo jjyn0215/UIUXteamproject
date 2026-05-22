@@ -1,8 +1,6 @@
 import '../models/alarm.dart';
 
 abstract interface class AlarmRepository {
-  Future<void> joinGroup({required String groupId, required String accessCode});
-
   Stream<List<Alarm>> watchAlarms({
     required String groupId,
     required String accessCode,

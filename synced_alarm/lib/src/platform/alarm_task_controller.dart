@@ -14,4 +14,24 @@ class AlarmTaskController {
       return;
     }
   }
+
+  static Future<bool> finishAlarmPresentation() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('finishAlarmPresentation') ??
+          false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> openNotificationSettings() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('openNotificationSettings') ??
+          false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
 }

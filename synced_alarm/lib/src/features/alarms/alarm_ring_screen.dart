@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../design/app_localizations.dart';
@@ -22,6 +23,28 @@ class AlarmRingScreen extends StatefulWidget {
 
 class _AlarmRingScreenState extends State<AlarmRingScreen> {
   bool _busy = false;
+  Timer? _autoSnoozeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoSnoozeTimer();
+  }
+
+  void _startAutoSnoozeTimer() {
+    final duration = Duration(minutes: widget.alarm.ringDurationMinutes);
+    _autoSnoozeTimer = Timer(duration, () {
+      if (mounted && !_busy) {
+        _run(widget.onSnooze);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoSnoozeTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +133,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   }
 
   Future<void> _run(Future<void> Function() action) async {
+    _autoSnoozeTimer?.cancel();
     setState(() => _busy = true);
     await action();
     if (mounted) setState(() => _busy = false);

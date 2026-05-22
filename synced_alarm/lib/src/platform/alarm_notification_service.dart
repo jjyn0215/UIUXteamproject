@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -20,6 +23,12 @@ const alarmNotificationSoundRepeatFlag = 4;
 const alarmNotificationDismissActionId = 'alarm_action_dismiss';
 const alarmNotificationSnoozeActionId = 'alarm_action_snooze';
 const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v3';
+const _alarmTriggerChannel = MethodChannel(
+  'com.teamproject.synced_alarm/alarm_trigger',
+);
+const _alarmSchedulerChannel = MethodChannel(
+  'com.teamproject.synced_alarm/alarm_scheduler',
+);
 
 const alarmNotificationActions = <AndroidNotificationAction>[
   AndroidNotificationAction(alarmNotificationSnoozeActionId, 'Snooze'),
@@ -75,13 +84,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
-  await AlarmNotificationService.instance.initializeLocalNotifications();
+  await AlarmNotificationService.instance._initializeBackgroundLocalNotifications();
   await AlarmNotificationService.instance.showRemoteMessage(message);
 }
 
 @pragma('vm:entry-point')
 void alarmNotificationTapBackground(NotificationResponse response) async {
   DartPluginRegistrant.ensureInitialized();
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   await AlarmNotificationService.instance.handleBackgroundNotificationResponse(
     response,
   );
@@ -105,6 +119,7 @@ class AlarmNotificationService {
   AlarmNotificationActionRequest? _pendingAlarmAction;
   bool _localInitialized = false;
   bool _messagingInitialized = false;
+  bool _nativeAlarmTriggerInitialized = false;
   bool _timeZoneInitialized = false;
   bool _exactAlarmPermissionRequested = false;
 
@@ -171,6 +186,7 @@ class AlarmNotificationService {
       onDidReceiveBackgroundNotificationResponse:
           alarmNotificationTapBackground,
     );
+    await _initializeNativeAlarmTriggers();
     if (captureInitialLaunch) {
       await _captureInitialAlarmLaunch();
     }
@@ -218,6 +234,70 @@ class AlarmNotificationService {
     );
   }
 
+  Future<void> showSnoozeNotification(Alarm alarm) async {
+    if (kIsWeb) return;
+    if (alarm.snoozeUntil == null) return;
+
+    final id = alarmNotificationId(alarm.id) + 10000;
+    final payload = AlarmNotificationPayload.fromAlarm(alarm);
+
+    final snoozeTime = alarm.snoozeUntil!;
+    final hour = snoozeTime.hour;
+    final minute = snoozeTime.minute.toString().padLeft(2, '0');
+    final period = hour < 12 ? 'AM' : 'PM';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    final timeStr = '$hour12:$minute $period';
+
+    final label = alarm.label.trim().isEmpty ? 'Alarm' : alarm.label;
+    final body = '$label · $timeStr에 다시 울립니다 (${alarm.snoozeCount}/${alarm.maxSnoozeCount}회)';
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        alarmSyncNotificationChannelId,
+        'Synced Alarm Sync',
+        channelDescription: 'Alarm sync and status notifications.',
+        importance: Importance.low,
+        priority: Priority.low,
+        category: AndroidNotificationCategory.status,
+        playSound: false,
+        enableVibration: false,
+        ongoing: true,
+        autoCancel: false,
+        actions: const <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            alarmNotificationDismissActionId,
+            'Dismiss',
+            semanticAction: SemanticAction.delete,
+          ),
+        ],
+      ),
+      linux: LinuxNotificationDetails(
+        urgency: LinuxNotificationUrgency.low,
+        defaultActionName: 'Open Synced Alarm',
+      ),
+      windows: WindowsNotificationDetails(
+        scenario: WindowsNotificationScenario.reminder,
+        duration: WindowsNotificationDuration.short,
+      ),
+    );
+
+    await initializeLocalNotifications();
+    await _notifications.show(
+      id: id,
+      title: '스누즈 진행 중',
+      body: body,
+      notificationDetails: details,
+      payload: payload.payload,
+    );
+  }
+
+  Future<void> cancelSnoozeNotification(String alarmId) async {
+    if (kIsWeb) return;
+    final id = alarmNotificationId(alarmId) + 10000;
+    await initializeLocalNotifications();
+    await _notifications.cancel(id: id);
+  }
+
   Future<void> scheduleAlarm(
     Alarm alarm, {
     bool requestExactPermission = false,
@@ -256,6 +336,9 @@ class AlarmNotificationService {
         payload: request.payload,
       );
     }
+    if (!background) {
+      await _scheduleForegroundAlarmTriggers(requests);
+    }
   }
 
   Future<void> cancelAlarm(Alarm alarm) {
@@ -278,6 +361,9 @@ class AlarmNotificationService {
         id: alarmNotificationWeekdayId(alarmId, weekday),
       );
     }
+    if (!background) {
+      await _cancelForegroundAlarmTriggersForAlarm(alarmId);
+    }
   }
 
   Future<void> cancelAllAlarms({bool background = false}) async {
@@ -289,6 +375,11 @@ class AlarmNotificationService {
         await initializeLocalNotifications();
       }
       await _notifications.cancelAll();
+      if (!background) {
+        await _alarmSchedulerChannel.invokeMethod<void>(
+          'cancelAllForegroundTriggers',
+        );
+      }
     } on Object catch (error) {
       if ('$error'.startsWith('LateInitializationError')) {
         return;
@@ -297,31 +388,151 @@ class AlarmNotificationService {
     }
   }
 
+  Future<void> scheduleForegroundTriggersForAlarm(Alarm alarm) async {
+    if (!alarm.enabled) return;
+    await _scheduleForegroundAlarmTriggers(
+      AlarmNotificationRequest.scheduledRequestsFromAlarm(alarm),
+    );
+  }
+
   Future<void> handleBackgroundNotificationResponse(
     NotificationResponse response,
   ) async {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
     final action = AlarmNotificationActionRequest.fromResponse(response);
     if (action == null) return;
+
+    final groupId = action.payloadData.groupId;
+    final alarmId = action.alarmId;
+    final hasGroup = groupId != null && groupId.isNotEmpty;
+
+    String deviceId = 'unknown_device';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      deviceId = prefs.getString('synced_alarm_device_id') ?? 'unknown_device';
+    } catch (_) {}
 
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
         await cancelAlarmById(action.alarmId, background: true);
+        if (hasGroup && FirebaseAuth.instance.currentUser != null) {
+          try {
+            final sourceAlarm = action.payloadData.toAlarm();
+            if (sourceAlarm != null) {
+              final dismissedAlarm = sourceAlarm.copyWith(
+                clearSnooze: true,
+                lastTriggeredDate: DateTime.now(),
+                updatedBy: deviceId,
+                revision: sourceAlarm.revision + 1,
+              );
+              await FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(groupId)
+                  .collection('alarms')
+                  .doc(alarmId)
+                  .set(dismissedAlarm.toJson(), SetOptions(merge: true));
+
+              final command = AlarmCommand.create(
+                groupId: groupId,
+                alarmId: alarmId,
+                commandType: AlarmCommandType.dismiss,
+                sourceDeviceId: deviceId,
+              );
+              await FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(groupId)
+                  .collection('commands')
+                  .doc(command.id)
+                  .set(command.toJson());
+            }
+          } catch (e, stackTrace) {
+            debugPrint('Error dismissing alarm in background: $e\n$stackTrace');
+          }
+        }
+
       case AlarmNotificationActionType.snooze:
         final sourceAlarm = action.payloadData.toAlarm();
         if (sourceAlarm == null) return;
         if (sourceAlarm.maxSnoozeCount <= 0 ||
             sourceAlarm.snoozeCount >= sourceAlarm.maxSnoozeCount) {
           await cancelAlarmById(action.alarmId, background: true);
+          if (hasGroup && FirebaseAuth.instance.currentUser != null) {
+            try {
+              final dismissedAlarm = sourceAlarm.copyWith(
+                clearSnooze: true,
+                lastTriggeredDate: DateTime.now(),
+                updatedBy: deviceId,
+                revision: sourceAlarm.revision + 1,
+              );
+              await FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(groupId)
+                  .collection('alarms')
+                  .doc(alarmId)
+                  .set(dismissedAlarm.toJson(), SetOptions(merge: true));
+
+              final command = AlarmCommand.create(
+                groupId: groupId,
+                alarmId: alarmId,
+                commandType: AlarmCommandType.dismiss,
+                sourceDeviceId: deviceId,
+              );
+              await FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(groupId)
+                  .collection('commands')
+                  .doc(command.id)
+                  .set(command.toJson());
+            } catch (e, stackTrace) {
+              debugPrint(
+                'Error auto-dismissing (max snooze) in background: $e\n$stackTrace',
+              );
+            }
+          }
           return;
         }
+
         final alarm = sourceAlarm.copyWith(
           snoozeUntil: DateTime.now().add(
             Duration(minutes: sourceAlarm.snoozeMinutes),
           ),
           snoozeCount: sourceAlarm.snoozeCount + 1,
+          updatedBy: deviceId,
+          revision: sourceAlarm.revision + 1,
         );
         await cancelAlarmById(action.alarmId, background: true);
         await scheduleAlarm(alarm, background: true);
+
+        if (hasGroup && FirebaseAuth.instance.currentUser != null) {
+          try {
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(groupId)
+                .collection('alarms')
+                .doc(alarmId)
+                .set(alarm.toJson(), SetOptions(merge: true));
+
+            final command = AlarmCommand.create(
+              groupId: groupId,
+              alarmId: alarmId,
+              commandType: AlarmCommandType.snooze,
+              sourceDeviceId: deviceId,
+            );
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(groupId)
+                .collection('commands')
+                .doc(command.id)
+                .set(command.toJson());
+          } catch (e, stackTrace) {
+            debugPrint('Error snoozing alarm in background: $e\n$stackTrace');
+          }
+        }
     }
   }
 
@@ -342,8 +553,85 @@ class AlarmNotificationService {
     );
   }
 
+  Alarm? _alarmFromData(
+    Map<String, String> data,
+    String alarmId,
+    String groupId,
+  ) {
+    try {
+      final hourAndMinuteStr = data['timeOfDayMinutes'];
+      if (hourAndMinuteStr == null) return null;
+      final timeOfDayMinutes = int.parse(hourAndMinuteStr);
+      final enabled = data['enabled'] == 'true';
+
+      final label = data['label'] ?? 'Alarm';
+      final ringDurationMinutes = int.parse(data['ringDurationMinutes'] ?? '5');
+      final soundEnabled = data['soundEnabled'] == 'true';
+      final vibrationEnabled = data['vibrationEnabled'] == 'true';
+      final snoozeMinutes = int.parse(data['snoozeMinutes'] ?? '5');
+      final maxSnoozeCount = int.parse(data['maxSnoozeCount'] ?? '3');
+      final snoozeCount = int.parse(data['snoozeCount'] ?? '0');
+      final revision = int.parse(data['revision'] ?? '0');
+
+      Set<int> repeatWeekdays = defaultAlarmRepeatWeekdays;
+      if (data.containsKey('repeatWeekdays')) {
+        try {
+          final List<dynamic> list = jsonDecode(data['repeatWeekdays']!);
+          repeatWeekdays = list.map((e) => int.parse(e.toString())).toSet();
+        } catch (_) {}
+      }
+
+      DateTime? snoozeUntil;
+      if (data['snoozeUntil'] != null && data['snoozeUntil']!.isNotEmpty) {
+        snoozeUntil = DateTime.tryParse(data['snoozeUntil']!);
+      }
+
+      DateTime? lastTriggeredDate;
+      if (data['lastTriggeredDate'] != null &&
+          data['lastTriggeredDate']!.isNotEmpty) {
+        lastTriggeredDate = DateTime.tryParse(data['lastTriggeredDate']!);
+      }
+
+      final createdAt =
+          data['createdAt'] != null && data['createdAt']!.isNotEmpty
+          ? DateTime.tryParse(data['createdAt']!) ?? DateTime.now()
+          : DateTime.now();
+
+      final updatedAt =
+          data['updatedAt'] != null && data['updatedAt']!.isNotEmpty
+          ? DateTime.tryParse(data['updatedAt']!) ?? DateTime.now()
+          : DateTime.now();
+
+      final updatedBy = data['updatedBy'];
+
+      return Alarm(
+        id: alarmId,
+        groupId: groupId,
+        label: label,
+        timeOfDayMinutes: timeOfDayMinutes,
+        enabled: enabled,
+        repeatWeekdays: repeatWeekdays,
+        ringDurationMinutes: ringDurationMinutes,
+        soundEnabled: soundEnabled,
+        vibrationEnabled: vibrationEnabled,
+        snoozeMinutes: snoozeMinutes,
+        maxSnoozeCount: maxSnoozeCount,
+        snoozeCount: snoozeCount,
+        snoozeUntil: snoozeUntil,
+        lastTriggeredDate: lastTriggeredDate,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        updatedBy: updatedBy != null && updatedBy.isNotEmpty ? updatedBy : null,
+        revision: revision,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error parsing Alarm from FCM data: $e\n$stackTrace');
+      return null;
+    }
+  }
+
   Future<void> _handleSilentSync(RemoteMessage message) async {
-    final data = message.data;
+    final Map<String, String> data = message.data.cast<String, String>();
     final type = data['type'];
     final groupId = data['groupId'];
     final alarmId = data['alarmId'];
@@ -357,42 +645,21 @@ class AlarmNotificationService {
 
     try {
       if (type == 'alarm.created' || type == 'alarm.updated') {
-        final doc = await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(groupId)
-            .collection('alarms')
-            .doc(alarmId)
-            .get();
-
-        if (doc.exists && doc.data() != null) {
-          final alarm = Alarm.fromJson(doc.id, {
-            ...doc.data()!,
-            'groupId': groupId,
-          });
+        final alarm = _alarmFromData(data, alarmId, groupId);
+        if (alarm != null) {
           await scheduleAlarm(alarm, background: true);
+        } else {
+          debugPrint(
+            'Silent sync: Alarm data was null or failed to parse from FCM payload.',
+          );
         }
-      } else if (type == 'alarm.deleted') {
+      } else if (shouldCancelLocalScheduleForSilentSync(data)) {
         await cancelAlarmById(alarmId, background: true);
       } else if (type == 'alarm.command') {
-        final commandType = data['commandType'];
-        if (commandType == 'dismiss') {
-          await cancelAlarmById(alarmId, background: true);
-        } else if (commandType == 'snooze') {
-          final doc = await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(groupId)
-              .collection('alarms')
-              .doc(alarmId)
-              .get();
-
-          if (doc.exists && doc.data() != null) {
-            final alarm = Alarm.fromJson(doc.id, {
-              ...doc.data()!,
-              'groupId': groupId,
-            });
-            await scheduleAlarm(alarm, background: true);
-          }
-        }
+        debugPrint(
+          'Silent sync: command ${data['commandType']} received for $alarmId; '
+          'local schedule is driven by alarm update/delete payloads.',
+        );
       }
     } catch (e, stackTrace) {
       debugPrint('Error during background silent sync: $e\n$stackTrace');
@@ -473,6 +740,62 @@ class AlarmNotificationService {
     if (launch == null) return;
     _pendingAlarmLaunch = launch;
     _alarmLaunchController.add(launch);
+  }
+
+  Future<void> _initializeNativeAlarmTriggers() async {
+    if (_nativeAlarmTriggerInitialized ||
+        kIsWeb ||
+        defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    _alarmTriggerChannel.setMethodCallHandler(_handleNativeAlarmTriggerCall);
+    _nativeAlarmTriggerInitialized = true;
+    try {
+      final pendingPayload = await _alarmTriggerChannel.invokeMethod<String>(
+        'consumePendingAlarmTrigger',
+      );
+      if (pendingPayload != null && pendingPayload.isNotEmpty) {
+        _handleNotificationPayload(pendingPayload);
+      }
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  Future<Object?> _handleNativeAlarmTriggerCall(MethodCall call) async {
+    if (call.method != 'alarmTriggered') return null;
+    final payload = call.arguments as String?;
+    if (payload == null || payload.isEmpty) return false;
+    _handleNotificationPayload(payload);
+    return true;
+  }
+
+  Future<void> _scheduleForegroundAlarmTriggers(
+    List<AlarmNotificationRequest> requests,
+  ) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    final args = foregroundAlarmTriggerArgumentsFromRequests(requests);
+    if (args.isEmpty) return;
+    try {
+      await _alarmSchedulerChannel.invokeMethod<void>(
+        'scheduleForegroundTriggers',
+        args,
+      );
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  Future<void> _cancelForegroundAlarmTriggersForAlarm(String alarmId) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _alarmSchedulerChannel.invokeMethod<void>(
+        'cancelForegroundTriggers',
+        foregroundAlarmTriggerIdsForAlarm(alarmId),
+      );
+    } on MissingPluginException {
+      return;
+    }
   }
 
   Future<void> _createRingingChannelFor(Alarm alarm) async {
@@ -559,6 +882,10 @@ bool shouldShowRemoteDataNotification(Map<String, dynamic> data) {
     return false;
   }
   return type.isNotEmpty;
+}
+
+bool shouldCancelLocalScheduleForSilentSync(Map<String, dynamic> data) {
+  return '${data['type'] ?? ''}' == 'alarm.deleted';
 }
 
 class AlarmNotificationLaunch {
@@ -850,14 +1177,24 @@ class AlarmNotificationRequest {
     final weekdays = alarm.repeatWeekdays.toList()..sort();
     return [
       for (final weekday in weekdays)
-        AlarmNotificationRequest(
-          id: alarmNotificationWeekdayId(alarm.id, weekday),
-          title: payload.title,
-          body: payload.body,
-          payload: payload.payload,
-          scheduledAt: _nextWeekdayOccurrence(alarm, weekday, base),
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        ),
+        () {
+          final scheduledAt = _nextWeekdayOccurrence(alarm, weekday, base);
+          // 만약 다음 실행 날짜가 6일 이상 떨어져 있고 오늘 요일과 일치한다면(이미 오늘 울리고 다음 주로 계산된 경우),
+          // dayOfWeekAndTime 버그를 방지하기 위해 단발성(matchDateTimeComponents = null) 알람으로 예약을 우회합니다.
+          final isNextWeekAlready =
+              scheduledAt.difference(base).inDays >= 6 &&
+              weekday == base.weekday;
+          return AlarmNotificationRequest(
+            id: alarmNotificationWeekdayId(alarm.id, weekday),
+            title: payload.title,
+            body: payload.body,
+            payload: payload.payload,
+            scheduledAt: scheduledAt,
+            matchDateTimeComponents: isNextWeekAlready
+                ? null
+                : DateTimeComponents.dayOfWeekAndTime,
+          );
+        }(),
     ];
   }
 
@@ -867,6 +1204,27 @@ class AlarmNotificationRequest {
   final String? payload;
   final DateTime scheduledAt;
   final DateTimeComponents? matchDateTimeComponents;
+}
+
+List<Map<String, Object?>> foregroundAlarmTriggerArgumentsFromRequests(
+  List<AlarmNotificationRequest> requests,
+) {
+  return [
+    for (final request in requests)
+      {
+        'id': request.id,
+        'triggerAtMillis': request.scheduledAt.millisecondsSinceEpoch,
+        'payload': request.payload,
+      },
+  ];
+}
+
+List<int> foregroundAlarmTriggerIdsForAlarm(String alarmId) {
+  return [
+    alarmNotificationId(alarmId),
+    for (final weekday in defaultAlarmRepeatWeekdays)
+      alarmNotificationWeekdayId(alarmId, weekday),
+  ];
 }
 
 DateTime _nextWeekdayOccurrence(Alarm alarm, int weekday, DateTime from) {

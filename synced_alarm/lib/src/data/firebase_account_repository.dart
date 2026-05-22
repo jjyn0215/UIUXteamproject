@@ -144,17 +144,36 @@ class FirebaseAccountRepository implements AccountRepository {
     );
   }
 
-  Future<void> _upsertCurrentUserProfile({String? uid, String? displayName}) {
+  Future<void> _upsertCurrentUserProfile({
+    String? uid,
+    String? displayName,
+  }) async {
     final user = _requireUser();
+    final docRef = _firestore.collection('users').doc(uid ?? user.uid);
+
+    String? existingCreatedAt;
+    try {
+      final docSnap = await withFirebaseOperationTimeout(
+        docRef.get(),
+        operationName: 'get user profile for upsert',
+      );
+      if (docSnap.exists) {
+        existingCreatedAt = docSnap.data()?['createdAt'] as String?;
+      }
+    } catch (_) {
+      // Ignore reading errors, fallback to generating new createdAt
+    }
+
+    final nowStr = DateTime.now().toIso8601String();
     return withFirebaseOperationTimeout(
-      _firestore.collection('users').doc(uid ?? user.uid).set({
+      docRef.set({
         'uid': user.uid,
         'email': user.email ?? '',
         'displayName': displayName?.trim().isNotEmpty == true
             ? displayName!.trim()
             : _displayName(user),
-        'createdAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
+        'createdAt': existingCreatedAt ?? nowStr,
+        'updatedAt': nowStr,
       }, SetOptions(merge: true)),
       operationName: 'upsert user profile',
     );

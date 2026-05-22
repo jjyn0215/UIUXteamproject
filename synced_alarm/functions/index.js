@@ -125,12 +125,39 @@ exports.onAlarmWrite = onDocumentWritten(
     const before = event.data.before.exists ? event.data.before.data() : null;
     const action = after ? (before ? "alarm.updated" : "alarm.created") : "alarm.deleted";
 
-    await fanOutToGroupDevices(event.params.groupId, {
+    logger.info("onAlarmWrite triggered", {
+      action,
+      groupId: event.params.groupId,
+      alarmId: event.params.alarmId,
+      revision: after?.revision ?? before?.revision ?? 0,
+    });
+
+    const payload = {
       type: action,
       groupId: event.params.groupId,
       alarmId: event.params.alarmId,
       revision: String(after?.revision ?? before?.revision ?? 0),
-    });
+    };
+
+    if (after) {
+      payload.label = String(after.label || "Alarm");
+      payload.timeOfDayMinutes = String(after.timeOfDayMinutes ?? 420);
+      payload.enabled = String(after.enabled ?? true);
+      payload.repeatWeekdays = JSON.stringify(after.repeatWeekdays || []);
+      payload.ringDurationMinutes = String(after.ringDurationMinutes ?? 5);
+      payload.soundEnabled = String(after.soundEnabled ?? true);
+      payload.vibrationEnabled = String(after.vibrationEnabled ?? true);
+      payload.snoozeMinutes = String(after.snoozeMinutes ?? 5);
+      payload.maxSnoozeCount = String(after.maxSnoozeCount ?? 3);
+      payload.snoozeCount = String(after.snoozeCount ?? 0);
+      payload.snoozeUntil = after.snoozeUntil ? String(after.snoozeUntil) : "";
+      payload.lastTriggeredDate = after.lastTriggeredDate ? String(after.lastTriggeredDate) : "";
+      payload.createdAt = after.createdAt ? String(after.createdAt) : "";
+      payload.updatedAt = after.updatedAt ? String(after.updatedAt) : "";
+      payload.updatedBy = after.updatedBy ? String(after.updatedBy) : "";
+    }
+
+    await fanOutToGroupDevices(event.params.groupId, payload);
   },
 );
 
@@ -173,16 +200,20 @@ exports.cleanupInvalidTokens = onCall({invoker: "public"}, async (request) => {
   }
 
   await Promise.all(
-    deviceIds.map((deviceId) =>
-      db.doc(`groups/${groupId}/devices/${deviceId}`).set(
-        {
-          fcmToken: FieldValue.delete(),
-          notificationsEnabled: false,
-          lastSeenAt: FieldValue.serverTimestamp(),
-        },
-        {merge: true},
-      ),
-    ),
+    deviceIds.map(async (deviceId) => {
+      const deviceRef = db.doc(`groups/${groupId}/devices/${deviceId}`);
+      const deviceDoc = await deviceRef.get();
+      if (deviceDoc.exists && deviceDoc.data()?.uid === request.auth.uid) {
+        await deviceRef.set(
+          {
+            fcmToken: FieldValue.delete(),
+            notificationsEnabled: false,
+            lastSeenAt: FieldValue.serverTimestamp(),
+          },
+          {merge: true},
+        );
+      }
+    }),
   );
 
   return {removed: deviceIds.length};
@@ -199,40 +230,93 @@ async function fanOutToGroupDevices(groupId, data) {
     .map((doc) => ({id: doc.id, ...doc.data()}))
     .filter((device) => typeof device.fcmToken === "string" && device.fcmToken);
 
+  logger.info("fanOutToGroupDevices starting", {
+    groupId,
+    payloadType: data.type,
+    alarmId: data.alarmId,
+    totalDevicesFound: devices.length,
+  });
+
   if (devices.length === 0) {
-    logger.info("No FCM-capable devices", {groupId, data});
+    logger.info("No FCM-capable devices found for group", {groupId, data});
     return;
   }
 
-  const response = await getMessaging().sendEachForMulticast({
-    tokens: devices.map((device) => device.fcmToken),
-    data: stringifyData(data),
-    android: {priority: "high"},
-    webpush: {
-      headers: {Urgency: "high"},
-      notification: {
-        title: "Synced Alarm",
-        body: data.commandType ? `Alarm ${data.commandType}` : "Alarm updated",
-      },
-    },
+  const chunkSize = 500;
+  const messaging = getMessaging();
+  const stringifiedData = stringifyData(data);
+  const cleanup = [];
+
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (let i = 0; i < devices.length; i += chunkSize) {
+    const chunkDevices = devices.slice(i, i + chunkSize);
+    const tokens = chunkDevices.map((d) => d.fcmToken);
+
+    try {
+      const response = await messaging.sendEachForMulticast({
+        tokens: tokens,
+        data: stringifiedData,
+        android: {priority: "high"},
+        webpush: {
+          headers: {Urgency: "high"},
+          notification: {
+            title: "Synced Alarm",
+            body: data.commandType ? `Alarm ${data.commandType}` : "Alarm updated",
+          },
+        },
+      });
+
+      response.responses.forEach((result, index) => {
+        if (result.success) {
+          successCount++;
+        } else {
+          failureCount++;
+          if (isInvalidTokenError(result.error)) {
+            cleanup.push(
+              db.doc(`groups/${groupId}/devices/${chunkDevices[index].id}`).set(
+                {
+                  fcmToken: FieldValue.delete(),
+                  notificationsEnabled: false,
+                  lastSeenAt: FieldValue.serverTimestamp(),
+                },
+                {merge: true},
+              ),
+            );
+          }
+        }
+      });
+    } catch (error) {
+      logger.error("Error during FCM multicast send chunk", {
+        error: error.message || error,
+        groupId,
+        chunkIndex: i,
+      });
+    }
+  }
+
+  logger.info("fanOutToGroupDevices completed", {
+    groupId,
+    successCount,
+    failureCount,
+    cleanupRequested: cleanup.length,
   });
 
-  const cleanup = [];
-  response.responses.forEach((result, index) => {
-    if (!result.success && isInvalidTokenError(result.error)) {
-      cleanup.push(
-        db.doc(`groups/${groupId}/devices/${devices[index].id}`).set(
-          {
-            fcmToken: FieldValue.delete(),
-            notificationsEnabled: false,
-            lastSeenAt: FieldValue.serverTimestamp(),
-          },
-          {merge: true},
-        ),
-      );
+  if (cleanup.length > 0) {
+    try {
+      await Promise.all(cleanup);
+      logger.info("Token cleanup completed successfully", {
+        groupId,
+        cleanupCount: cleanup.length,
+      });
+    } catch (error) {
+      logger.error("Error during token cleanup", {
+        error: error.message || error,
+        groupId,
+      });
     }
-  });
-  await Promise.all(cleanup);
+  }
 }
 
 function stringifyData(data) {
