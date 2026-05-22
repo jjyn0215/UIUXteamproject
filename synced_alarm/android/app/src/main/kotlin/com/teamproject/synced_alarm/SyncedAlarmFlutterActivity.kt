@@ -96,11 +96,11 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
         resumedActivityName = javaClass.name
     }
 
-    override fun onPause() {
+    override fun onStop() {
         if (resumedActivityName == javaClass.name) {
             resumedActivityName = null
         }
-        super.onPause()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

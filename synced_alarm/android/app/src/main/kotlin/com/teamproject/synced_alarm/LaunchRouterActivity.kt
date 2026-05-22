@@ -36,6 +36,6 @@ class LaunchRouterActivity : Activity() {
 
     private fun Intent?.isAlarmNotificationLaunch(): Boolean {
         if (this == null) return false
-        return action == "SELECT_NOTIFICATION" && hasExtra("payload")
+        return hasExtra("payload")
     }
 }
