@@ -91,14 +91,16 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        resumedActivityName = javaClass.name
+    override fun onStart() {
+        super.onStart()
+        if (isMainActivity()) {
+            isMainActivityVisible = true
+        }
     }
 
     override fun onStop() {
-        if (resumedActivityName == javaClass.name) {
-            resumedActivityName = null
+        if (isMainActivity()) {
+            isMainActivityVisible = false
         }
         super.onStop()
     }
@@ -111,6 +113,10 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
 
     protected open fun finishAlarmPresentation(): Boolean {
         return false
+    }
+
+    private fun isMainActivity(): Boolean {
+        return javaClass.name == MainActivity::class.java.name
     }
 
     private fun handleAlarmTriggerIntent(source: Intent?) {
@@ -142,13 +148,13 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
         const val EXTRA_ALARM_PAYLOAD = "alarm_payload"
 
         @Volatile
-        private var resumedActivityName: String? = null
+        private var isMainActivityVisible: Boolean = false
 
         @Volatile
         private var pendingAlarmTriggerPayload: String? = null
 
         fun shouldRouteForegroundAlarmToFlutter(): Boolean {
-            return resumedActivityName == MainActivity::class.java.name
+            return isMainActivityVisible
         }
 
         private fun consumePendingAlarmTriggerPayload(): String? {

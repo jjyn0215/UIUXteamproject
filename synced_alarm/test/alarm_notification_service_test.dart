@@ -79,11 +79,33 @@ void main() {
 
     expect(launch, isNotNull);
     expect(launch?.alarmId, 'alarm-1');
+    expect(launch?.source, AlarmNotificationLaunchSource.notification);
     expect(
       AlarmNotificationLaunch.fromPayload('alarm.command:alarm-1'),
       isNull,
     );
     expect(AlarmNotificationLaunch.fromPayload(null), isNull);
+  });
+
+  test('marks native foreground alarm launches separately from taps', () {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final payload = AlarmNotificationPayload.fromAlarm(alarm).payload;
+
+    final launch = AlarmNotificationLaunch.fromPayload(
+      payload,
+      source: AlarmNotificationLaunchSource.nativeForeground,
+    );
+
+    expect(launch?.alarmId, 'alarm-1');
+    expect(launch?.source, AlarmNotificationLaunchSource.nativeForeground);
   });
 
   test('parses alarm notification action responses', () {
@@ -170,6 +192,22 @@ void main() {
 
     expect(manifest, contains('android:name=".ForegroundAlarmReceiver"'));
   });
+
+  test(
+    'foreground alarm routing uses visible lifecycle instead of pause state',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'SyncedAlarmFlutterActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('override fun onStart()'));
+      expect(source, contains('override fun onStop()'));
+      expect(source, contains('private var isMainActivityVisible'));
+      expect(source, contains('return isMainActivityVisible'));
+      expect(source, isNot(contains('private var isMainActivityResumed')));
+    },
+  );
 
   test(
     'Android manifest routes full-screen alarms to a dedicated activity',

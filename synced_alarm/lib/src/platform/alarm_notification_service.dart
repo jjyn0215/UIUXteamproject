@@ -84,7 +84,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
-  await AlarmNotificationService.instance._initializeBackgroundLocalNotifications();
+  await AlarmNotificationService.instance
+      ._initializeBackgroundLocalNotifications();
   await AlarmNotificationService.instance.showRemoteMessage(message);
 }
 
@@ -249,7 +250,8 @@ class AlarmNotificationService {
     final timeStr = '$hour12:$minute $period';
 
     final label = alarm.label.trim().isEmpty ? 'Alarm' : alarm.label;
-    final body = '$label · $timeStr에 다시 울립니다 (${alarm.snoozeCount}/${alarm.maxSnoozeCount}회)';
+    final body =
+        '$label · $timeStr에 다시 울립니다 (${alarm.snoozeCount}/${alarm.maxSnoozeCount}회)';
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -735,8 +737,12 @@ class AlarmNotificationService {
     _handleNotificationPayload(response.payload);
   }
 
-  void _handleNotificationPayload(String? payload) {
-    final launch = AlarmNotificationLaunch.fromPayload(payload);
+  void _handleNotificationPayload(
+    String? payload, {
+    AlarmNotificationLaunchSource source =
+        AlarmNotificationLaunchSource.notification,
+  }) {
+    final launch = AlarmNotificationLaunch.fromPayload(payload, source: source);
     if (launch == null) return;
     _pendingAlarmLaunch = launch;
     _alarmLaunchController.add(launch);
@@ -755,7 +761,10 @@ class AlarmNotificationService {
         'consumePendingAlarmTrigger',
       );
       if (pendingPayload != null && pendingPayload.isNotEmpty) {
-        _handleNotificationPayload(pendingPayload);
+        _handleNotificationPayload(
+          pendingPayload,
+          source: AlarmNotificationLaunchSource.nativeForeground,
+        );
       }
     } on MissingPluginException {
       return;
@@ -766,7 +775,10 @@ class AlarmNotificationService {
     if (call.method != 'alarmTriggered') return null;
     final payload = call.arguments as String?;
     if (payload == null || payload.isEmpty) return false;
-    _handleNotificationPayload(payload);
+    _handleNotificationPayload(
+      payload,
+      source: AlarmNotificationLaunchSource.nativeForeground,
+    );
     return true;
   }
 
@@ -888,13 +900,26 @@ bool shouldCancelLocalScheduleForSilentSync(Map<String, dynamic> data) {
   return '${data['type'] ?? ''}' == 'alarm.deleted';
 }
 
-class AlarmNotificationLaunch {
-  const AlarmNotificationLaunch({required this.alarmId});
+enum AlarmNotificationLaunchSource {
+  notification,
+  nativeForeground,
+  foregroundTimer,
+}
 
-  static AlarmNotificationLaunch? fromPayload(String? payload) {
+class AlarmNotificationLaunch {
+  const AlarmNotificationLaunch({
+    required this.alarmId,
+    this.source = AlarmNotificationLaunchSource.notification,
+  });
+
+  static AlarmNotificationLaunch? fromPayload(
+    String? payload, {
+    AlarmNotificationLaunchSource source =
+        AlarmNotificationLaunchSource.notification,
+  }) {
     final data = AlarmNotificationPayloadData.fromPayload(payload);
     if (data != null) {
-      return AlarmNotificationLaunch(alarmId: data.alarmId);
+      return AlarmNotificationLaunch(alarmId: data.alarmId, source: source);
     }
 
     const alarmPayloadPrefix = 'alarm:';
@@ -904,10 +929,11 @@ class AlarmNotificationLaunch {
 
     final alarmId = payload.substring(alarmPayloadPrefix.length).trim();
     if (alarmId.isEmpty) return null;
-    return AlarmNotificationLaunch(alarmId: alarmId);
+    return AlarmNotificationLaunch(alarmId: alarmId, source: source);
   }
 
   final String alarmId;
+  final AlarmNotificationLaunchSource source;
 }
 
 enum AlarmNotificationActionType { dismiss, snooze }
