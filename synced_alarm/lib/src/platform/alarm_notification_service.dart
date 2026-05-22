@@ -23,6 +23,8 @@ const alarmNotificationSoundRepeatFlag = 4;
 const alarmNotificationDismissActionId = 'alarm_action_dismiss';
 const alarmNotificationSnoozeActionId = 'alarm_action_snooze';
 const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v3';
+const _alarmPayloadPurposeAlarm = 'alarm';
+const _alarmPayloadPurposeSnoozeStatus = 'snoozeStatus';
 const _alarmTriggerChannel = MethodChannel(
   'com.teamproject.synced_alarm/alarm_trigger',
 );
@@ -240,7 +242,7 @@ class AlarmNotificationService {
     if (alarm.snoozeUntil == null) return;
 
     final id = alarmNotificationId(alarm.id) + 10000;
-    final payload = AlarmNotificationPayload.fromAlarm(alarm);
+    final payload = AlarmNotificationPayload.fromSnoozeStatus(alarm);
 
     final snoozeTime = alarm.snoozeUntil!;
     final hour = snoozeTime.hour;
@@ -424,34 +426,31 @@ class AlarmNotificationService {
         await cancelAlarmById(action.alarmId, background: true);
         if (hasGroup && FirebaseAuth.instance.currentUser != null) {
           try {
-            final sourceAlarm = action.payloadData.toAlarm();
-            if (sourceAlarm != null) {
-              final dismissedAlarm = sourceAlarm.copyWith(
-                clearSnooze: true,
-                lastTriggeredDate: DateTime.now(),
-                updatedBy: deviceId,
-                revision: sourceAlarm.revision + 1,
-              );
-              await FirebaseFirestore.instance
-                  .collection('groups')
-                  .doc(groupId)
-                  .collection('alarms')
-                  .doc(alarmId)
-                  .set(dismissedAlarm.toJson(), SetOptions(merge: true));
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(groupId)
+                .collection('alarms')
+                .doc(alarmId)
+                .set({
+                  ...alarmDismissPatch(
+                    now: DateTime.now(),
+                    updatedBy: deviceId,
+                  ),
+                  'revision': FieldValue.increment(1),
+                }, SetOptions(merge: true));
 
-              final command = AlarmCommand.create(
-                groupId: groupId,
-                alarmId: alarmId,
-                commandType: AlarmCommandType.dismiss,
-                sourceDeviceId: deviceId,
-              );
-              await FirebaseFirestore.instance
-                  .collection('groups')
-                  .doc(groupId)
-                  .collection('commands')
-                  .doc(command.id)
-                  .set(command.toJson());
-            }
+            final command = AlarmCommand.create(
+              groupId: groupId,
+              alarmId: alarmId,
+              commandType: AlarmCommandType.dismiss,
+              sourceDeviceId: deviceId,
+            );
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(groupId)
+                .collection('commands')
+                .doc(command.id)
+                .set(command.toJson());
           } catch (e, stackTrace) {
             debugPrint('Error dismissing alarm in background: $e\n$stackTrace');
           }
@@ -465,18 +464,18 @@ class AlarmNotificationService {
           await cancelAlarmById(action.alarmId, background: true);
           if (hasGroup && FirebaseAuth.instance.currentUser != null) {
             try {
-              final dismissedAlarm = sourceAlarm.copyWith(
-                clearSnooze: true,
-                lastTriggeredDate: DateTime.now(),
-                updatedBy: deviceId,
-                revision: sourceAlarm.revision + 1,
-              );
               await FirebaseFirestore.instance
                   .collection('groups')
                   .doc(groupId)
                   .collection('alarms')
                   .doc(alarmId)
-                  .set(dismissedAlarm.toJson(), SetOptions(merge: true));
+                  .set({
+                    ...alarmDismissPatch(
+                      now: DateTime.now(),
+                      updatedBy: deviceId,
+                    ),
+                    'revision': FieldValue.increment(1),
+                  }, SetOptions(merge: true));
 
               final command = AlarmCommand.create(
                 groupId: groupId,
@@ -499,11 +498,15 @@ class AlarmNotificationService {
           return;
         }
 
+        final now = DateTime.now();
+        final snoozeUntil = now.add(
+          Duration(minutes: sourceAlarm.snoozeMinutes),
+        );
+        final snoozeCount = sourceAlarm.snoozeCount + 1;
         final alarm = sourceAlarm.copyWith(
-          snoozeUntil: DateTime.now().add(
-            Duration(minutes: sourceAlarm.snoozeMinutes),
-          ),
-          snoozeCount: sourceAlarm.snoozeCount + 1,
+          snoozeUntil: snoozeUntil,
+          snoozeCount: snoozeCount,
+          lastTriggeredDate: now,
           updatedBy: deviceId,
           revision: sourceAlarm.revision + 1,
         );
@@ -517,7 +520,15 @@ class AlarmNotificationService {
                 .doc(groupId)
                 .collection('alarms')
                 .doc(alarmId)
-                .set(alarm.toJson(), SetOptions(merge: true));
+                .set({
+                  ...alarmSnoozePatch(
+                    now: now,
+                    updatedBy: deviceId,
+                    snoozeMinutes: sourceAlarm.snoozeMinutes,
+                    snoozeCount: snoozeCount,
+                  ),
+                  'revision': FieldValue.increment(1),
+                }, SetOptions(merge: true));
 
             final command = AlarmCommand.create(
               groupId: groupId,
@@ -900,6 +911,36 @@ bool shouldCancelLocalScheduleForSilentSync(Map<String, dynamic> data) {
   return '${data['type'] ?? ''}' == 'alarm.deleted';
 }
 
+Map<String, Object?> alarmDismissPatch({
+  required DateTime now,
+  required String updatedBy,
+}) {
+  final timestamp = now.toIso8601String();
+  return {
+    'snoozeUntil': null,
+    'snoozeCount': 0,
+    'lastTriggeredDate': timestamp,
+    'updatedAt': timestamp,
+    'updatedBy': updatedBy,
+  };
+}
+
+Map<String, Object?> alarmSnoozePatch({
+  required DateTime now,
+  required String updatedBy,
+  required int snoozeMinutes,
+  required int snoozeCount,
+}) {
+  final timestamp = now.toIso8601String();
+  return {
+    'snoozeUntil': now.add(Duration(minutes: snoozeMinutes)).toIso8601String(),
+    'snoozeCount': snoozeCount,
+    'lastTriggeredDate': timestamp,
+    'updatedAt': timestamp,
+    'updatedBy': updatedBy,
+  };
+}
+
 enum AlarmNotificationLaunchSource {
   notification,
   nativeForeground,
@@ -919,6 +960,7 @@ class AlarmNotificationLaunch {
   }) {
     final data = AlarmNotificationPayloadData.fromPayload(payload);
     if (data != null) {
+      if (!data.launchesAlarmUi) return null;
       return AlarmNotificationLaunch(alarmId: data.alarmId, source: source);
     }
 
@@ -951,8 +993,7 @@ class AlarmNotificationActionRequest {
     final payloadData = AlarmNotificationPayloadData.fromPayload(
       response.payload,
     );
-    final launch = AlarmNotificationLaunch.fromPayload(response.payload);
-    if (payloadData == null || launch == null) return null;
+    if (payloadData == null) return null;
 
     final type = switch (response.actionId) {
       alarmNotificationDismissActionId => AlarmNotificationActionType.dismiss,
@@ -962,7 +1003,7 @@ class AlarmNotificationActionRequest {
     if (type == null) return null;
 
     return AlarmNotificationActionRequest(
-      alarmId: launch.alarmId,
+      alarmId: payloadData.alarmId,
       type: type,
       payloadData: payloadData,
     );
@@ -986,9 +1027,13 @@ class AlarmNotificationPayloadData {
     this.snoozeMinutes = defaultAlarmSnoozeMinutes,
     this.maxSnoozeCount = defaultAlarmMaxSnoozeCount,
     this.snoozeCount = 0,
+    this.purpose = _alarmPayloadPurposeAlarm,
   });
 
-  factory AlarmNotificationPayloadData.fromAlarm(Alarm alarm) {
+  factory AlarmNotificationPayloadData.fromAlarm(
+    Alarm alarm, {
+    String purpose = _alarmPayloadPurposeAlarm,
+  }) {
     return AlarmNotificationPayloadData(
       alarmId: alarm.id,
       groupId: alarm.groupId,
@@ -1001,6 +1046,7 @@ class AlarmNotificationPayloadData {
       snoozeMinutes: alarm.snoozeMinutes,
       maxSnoozeCount: alarm.maxSnoozeCount,
       snoozeCount: alarm.snoozeCount,
+      purpose: purpose,
     );
   }
 
@@ -1012,6 +1058,8 @@ class AlarmNotificationPayloadData {
       if (decoded['type'] != 'alarm') return null;
       final alarmId = decoded['alarmId'] as String?;
       if (alarmId == null || alarmId.trim().isEmpty) return null;
+      final purpose =
+          decoded['purpose'] as String? ?? _alarmPayloadPurposeAlarm;
       return AlarmNotificationPayloadData(
         alarmId: alarmId,
         groupId: decoded['groupId'] as String?,
@@ -1028,6 +1076,7 @@ class AlarmNotificationPayloadData {
         maxSnoozeCount:
             decoded['maxSnoozeCount'] as int? ?? defaultAlarmMaxSnoozeCount,
         snoozeCount: decoded['snoozeCount'] as int? ?? 0,
+        purpose: purpose,
       );
     } on Object {
       const alarmPayloadPrefix = 'alarm:';
@@ -1049,10 +1098,14 @@ class AlarmNotificationPayloadData {
   final int snoozeMinutes;
   final int maxSnoozeCount;
   final int snoozeCount;
+  final String purpose;
+
+  bool get launchesAlarmUi => purpose == _alarmPayloadPurposeAlarm;
 
   String encode() {
     return jsonEncode({
       'type': 'alarm',
+      'purpose': purpose,
       'alarmId': alarmId,
       if (groupId != null) 'groupId': groupId,
       if (label != null) 'label': label,
@@ -1116,6 +1169,19 @@ class AlarmNotificationPayload {
     return AlarmNotificationPayload(
       id: alarmNotificationId(alarm.id),
       title: 'Synced Alarm',
+      body: '${alarm.timeLabel} · ${alarm.label}',
+      payload: data.encode(),
+    );
+  }
+
+  factory AlarmNotificationPayload.fromSnoozeStatus(Alarm alarm) {
+    final data = AlarmNotificationPayloadData.fromAlarm(
+      alarm,
+      purpose: _alarmPayloadPurposeSnoozeStatus,
+    );
+    return AlarmNotificationPayload(
+      id: alarmNotificationId(alarm.id) + 10000,
+      title: '스누즈 진행 중',
       body: '${alarm.timeLabel} · ${alarm.label}',
       payload: data.encode(),
     );

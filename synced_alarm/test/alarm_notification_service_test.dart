@@ -87,6 +87,35 @@ void main() {
     expect(AlarmNotificationLaunch.fromPayload(null), isNull);
   });
 
+  test('snooze status payload supports actions without opening alarm UI', () {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      snoozeUntil: DateTime(2026, 5, 7, 9, 5),
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final payload = AlarmNotificationPayload.fromSnoozeStatus(alarm).payload;
+
+    expect(AlarmNotificationLaunch.fromPayload(payload), isNull);
+
+    final dismiss = AlarmNotificationActionRequest.fromResponse(
+      NotificationResponse(
+        notificationResponseType:
+            NotificationResponseType.selectedNotificationAction,
+        actionId: alarmNotificationDismissActionId,
+        payload: payload,
+      ),
+    );
+
+    expect(dismiss?.alarmId, 'alarm-1');
+    expect(dismiss?.type, AlarmNotificationActionType.dismiss);
+    expect(dismiss?.payloadData.groupId, 'demo');
+  });
+
   test('marks native foreground alarm launches separately from taps', () {
     final alarm = Alarm(
       id: 'alarm-1',
@@ -152,6 +181,66 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  test('background dismiss writes only mutable alarm state fields', () {
+    final now = DateTime.utc(2026, 5, 23, 7, 30);
+
+    final patch = alarmDismissPatch(now: now, updatedBy: 'device-1');
+
+    expect(
+      patch.keys,
+      unorderedEquals([
+        'snoozeUntil',
+        'snoozeCount',
+        'lastTriggeredDate',
+        'updatedAt',
+        'updatedBy',
+      ]),
+    );
+    expect(patch['snoozeUntil'], isNull);
+    expect(patch['snoozeCount'], 0);
+    expect(patch['lastTriggeredDate'], now.toIso8601String());
+    expect(patch['updatedAt'], now.toIso8601String());
+    expect(patch['updatedBy'], 'device-1');
+    expect(patch, isNot(contains('enabled')));
+    expect(patch, isNot(contains('label')));
+    expect(patch, isNot(contains('timeOfDayMinutes')));
+    expect(patch, isNot(contains('createdAt')));
+  });
+
+  test('background snooze writes only mutable alarm state fields', () {
+    final now = DateTime.utc(2026, 5, 23, 7, 30);
+
+    final patch = alarmSnoozePatch(
+      now: now,
+      updatedBy: 'device-1',
+      snoozeMinutes: 10,
+      snoozeCount: 2,
+    );
+
+    expect(
+      patch.keys,
+      unorderedEquals([
+        'snoozeUntil',
+        'snoozeCount',
+        'lastTriggeredDate',
+        'updatedAt',
+        'updatedBy',
+      ]),
+    );
+    expect(
+      patch['snoozeUntil'],
+      now.add(const Duration(minutes: 10)).toIso8601String(),
+    );
+    expect(patch['snoozeCount'], 2);
+    expect(patch['lastTriggeredDate'], now.toIso8601String());
+    expect(patch['updatedAt'], now.toIso8601String());
+    expect(patch['updatedBy'], 'device-1');
+    expect(patch, isNot(contains('enabled')));
+    expect(patch, isNot(contains('label')));
+    expect(patch, isNot(contains('timeOfDayMinutes')));
+    expect(patch, isNot(contains('createdAt')));
   });
 
   test('alarm notification actions do not open the app UI', () {
@@ -225,6 +314,21 @@ void main() {
       );
       expect(manifest, contains('android:showWhenLocked="true"'));
       expect(manifest, contains('android:turnScreenOn="true"'));
+    },
+  );
+
+  test(
+    'LaunchRouterActivity only routes ringing alarm payloads to AlarmActivity',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'LaunchRouterActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('JSONObject(payload)'));
+      expect(source, contains('optString("type") == "alarm"'));
+      expect(source, contains('optString("purpose", "alarm") == "alarm"'));
+      expect(source, isNot(contains('return hasExtra("payload")')));
     },
   );
 

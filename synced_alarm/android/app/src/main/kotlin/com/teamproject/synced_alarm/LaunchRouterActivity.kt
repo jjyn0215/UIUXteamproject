@@ -3,6 +3,7 @@ package com.teamproject.synced_alarm
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import org.json.JSONObject
 
 class LaunchRouterActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,7 +36,13 @@ class LaunchRouterActivity : Activity() {
     }
 
     private fun Intent?.isAlarmNotificationLaunch(): Boolean {
-        if (this == null) return false
-        return hasExtra("payload")
+        val payload = this?.getStringExtra("payload") ?: return false
+        return try {
+            val json = JSONObject(payload)
+            json.optString("type") == "alarm" &&
+                json.optString("purpose", "alarm") == "alarm"
+        } catch (_: Exception) {
+            payload.startsWith("alarm:")
+        }
     }
 }
