@@ -53,15 +53,8 @@ void main() {
 
     await tester.pump();
 
-    expect(
-      find.text(useFirebase ? 'Local mode' : 'Local only'),
-      findsOneWidget,
-    );
-    expect(
-      find.widgetWithText(TextButton, 'Sign in'),
-      useFirebase ? findsOneWidget : findsNothing,
-    );
-    expect(find.widgetWithText(TextButton, 'Sign out'), findsNothing);
+    expect(find.text('Local alarms'), findsOneWidget);
+    expect(find.text('No account required'), findsOneWidget);
   });
 
   testWidgets('creates an account from the auth screen', (tester) async {

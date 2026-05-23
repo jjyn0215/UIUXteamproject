@@ -86,9 +86,7 @@ class SettingsPanel extends ConsumerWidget {
                 if (!useFirebase) return;
                 if (!signedIn) {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const AuthScreen(),
-                    ),
+                    MaterialPageRoute<void>(builder: (_) => const AuthScreen()),
                   );
                 } else {
                   Navigator.of(context).push(
@@ -168,7 +166,9 @@ class _ProfileHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    activeGroup?.name ?? profile?.displayName ?? l10n.localAlarms,
+                    activeGroup?.name ??
+                        profile?.displayName ??
+                        l10n.localAlarms,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0,
@@ -188,7 +188,9 @@ class _ProfileHeader extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: isDark ? SereneWakeColors.outlineDark : SereneWakeColors.outline,
+              color: isDark
+                  ? SereneWakeColors.outlineDark
+                  : SereneWakeColors.outline,
             ),
           ],
         ),
@@ -241,27 +243,20 @@ class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
     required this.title,
     required this.value,
-    this.detail,
-    this.trailing,
   });
 
   final String title;
   final String value;
-  final String? detail;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final detailText = detail;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
       child: Row(
-        crossAxisAlignment: detailText == null
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
@@ -282,28 +277,9 @@ class _SettingsRow extends StatelessWidget {
                     letterSpacing: 0,
                   ),
                 ),
-                if (detailText != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    detailText,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.sm),
-            Align(
-              alignment: detailText == null
-                  ? Alignment.center
-                  : Alignment.topCenter,
-              child: trailing!,
-            ),
-          ],
         ],
       ),
     );
