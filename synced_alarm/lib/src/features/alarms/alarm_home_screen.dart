@@ -277,14 +277,17 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     if (alarm == null) return false;
 
     _pendingAlarmAction = null;
-    await AlarmTaskController.stopAlarmVibration();
     await _dueTickTracker.markHandled(alarm, DateTime.now());
     final controller = ref.read(alarmListControllerProvider);
-    switch (action.type) {
-      case AlarmNotificationActionType.dismiss:
-        unawaited(controller.dismiss(alarm));
-      case AlarmNotificationActionType.snooze:
-        unawaited(controller.snooze(alarm));
+    try {
+      switch (action.type) {
+        case AlarmNotificationActionType.dismiss:
+          await controller.dismiss(alarm, clearRingingAlarm: false);
+        case AlarmNotificationActionType.snooze:
+          await controller.snooze(alarm, clearRingingAlarm: false);
+      }
+    } finally {
+      await _finishActiveAlarmPresentation(alarm);
     }
     return true;
   }
@@ -410,10 +413,17 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
       await _dueTickTracker.markHandled(alarm, DateTime.now());
       await action();
     } finally {
-      final finished = await AlarmTaskController.finishAlarmPresentation();
-      if (!finished) {
-        ref.read(ringingAlarmProvider.notifier).clear();
-      }
+      await _finishActiveAlarmPresentation(alarm);
+    }
+  }
+
+  Future<void> _finishActiveAlarmPresentation(Alarm alarm) async {
+    await AlarmTaskController.stopAlarmVibration();
+    final ringingAlarm = ref.read(ringingAlarmProvider);
+    if (ringingAlarm?.id != alarm.id) return;
+    final finished = await AlarmTaskController.finishAlarmPresentation();
+    if (!finished) {
+      ref.read(ringingAlarmProvider.notifier).clear();
     }
   }
 }

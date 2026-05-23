@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synced_alarm/src/app/synced_alarm_app.dart';
 import 'package:synced_alarm/src/data/app_providers.dart';
 import 'package:synced_alarm/src/models/alarm.dart';
+import 'package:synced_alarm/src/platform/alarm_notification_service.dart';
 import 'package:synced_alarm/src/platform/alarm_task_controller.dart';
 
 void main() {
@@ -139,6 +140,70 @@ void main() {
       expect(dismissButton.onPressed, isNotNull);
       dismissButton.onPressed?.call();
       await tester.pumpAndSettle(const Duration(seconds: 1));
+      for (var i = 0; i < 20; i++) {
+        if (calls.any((call) => call.method == 'finishAlarmPresentation')) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(
+        calls.map((call) => call.method),
+        contains('finishAlarmPresentation'),
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    }
+  });
+
+  testWidgets('notification dismiss finishes active alarm presentation', (
+    WidgetTester tester,
+  ) async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final calls = <MethodCall>[];
+    const channel = MethodChannel('com.teamproject.synced_alarm/alarm_task');
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call);
+      return null;
+    });
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+            alarmListControllerProvider.overrideWith(
+              (ref) => _NoopAlarmListController(ref),
+            ),
+            ringingAlarmProvider.overrideWith(
+              () => _FixedRingingAlarmNotifier(alarm),
+            ),
+          ],
+          child: const SyncedAlarmApp(),
+        ),
+      );
+      await tester.pump();
+
+      AlarmNotificationService.instance.handleNotificationResponseForTesting(
+        NotificationResponse(
+          notificationResponseType:
+              NotificationResponseType.selectedNotificationAction,
+          actionId: alarmNotificationDismissActionId,
+          payload: AlarmNotificationPayload.fromAlarm(alarm).payload,
+        ),
+      );
       for (var i = 0; i < 20; i++) {
         if (calls.any((call) => call.method == 'finishAlarmPresentation')) {
           break;

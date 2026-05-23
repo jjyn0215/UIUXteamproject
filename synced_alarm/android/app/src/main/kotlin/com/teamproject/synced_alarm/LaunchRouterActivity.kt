@@ -28,7 +28,7 @@ class LaunchRouterActivity : Activity() {
             data = source?.data
             if (targetClass == AlarmActivity::class.java) {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
         }
         startActivity(target)

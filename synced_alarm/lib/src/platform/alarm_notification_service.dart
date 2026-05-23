@@ -144,6 +144,11 @@ class AlarmNotificationService {
     return action;
   }
 
+  @visibleForTesting
+  void handleNotificationResponseForTesting(NotificationResponse response) {
+    _handleNotificationResponse(response);
+  }
+
   Future<void> initialize({required bool firebaseEnabled}) async {
     await initializeLocalNotifications();
     if (firebaseEnabled) {

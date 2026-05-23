@@ -5,6 +5,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:synced_alarm/src/models/alarm.dart';
 import 'package:synced_alarm/src/platform/alarm_notification_service.dart';
 
+String _androidActivityBlock(String manifest, String activityName) {
+  final nameIndex = manifest.indexOf('android:name="$activityName"');
+  expect(nameIndex, isNot(-1), reason: '$activityName must be registered');
+  final endIndex = manifest.indexOf('</activity>', nameIndex);
+  expect(endIndex, isNot(-1), reason: '$activityName must close its tag');
+  return manifest.substring(nameIndex, endIndex);
+}
+
 void main() {
   test('uses a dedicated ringing channel with repeated sound flag', () {
     expect(
@@ -323,6 +331,17 @@ void main() {
     },
   );
 
+  test('foreground alarm receiver reuses the existing main activity task', () {
+    final source = File(
+      'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+      'ForegroundAlarmReceiver.kt',
+    ).readAsStringSync();
+
+    expect(source, contains('Intent.FLAG_ACTIVITY_NEW_TASK'));
+    expect(source, contains('Intent.FLAG_ACTIVITY_SINGLE_TOP'));
+    expect(source, contains('Intent.FLAG_ACTIVITY_CLEAR_TOP'));
+  });
+
   test('native alarm vibration loops and can be cancelled', () {
     final file = File(
       'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
@@ -375,19 +394,61 @@ void main() {
     },
   );
 
-  test('AlarmActivity hides app task when the lock-screen alarm is dismissed', () {
-    final source = File(
-      'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
-      'AlarmActivity.kt',
+  test('Android manifest keeps regular app launches visible in recents', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
 
-    expect(source, contains('setShowWhenLocked(false)'));
-    expect(source, contains('setTurnScreenOn(false)'));
-    expect(source, contains('window.clearFlags'));
-    expect(source, contains('Intent.ACTION_MAIN'));
-    expect(source, contains('Intent.CATEGORY_HOME'));
-    expect(source, contains('overridePendingTransition(0, 0)'));
+    final launchRouterBlock = _androidActivityBlock(
+      manifest,
+      '.LaunchRouterActivity',
+    );
+    final mainActivityBlock = _androidActivityBlock(manifest, '.MainActivity');
+
+    expect(
+      launchRouterBlock,
+      isNot(contains('android:excludeFromRecents="true"')),
+    );
+    expect(
+      mainActivityBlock,
+      isNot(contains('android:excludeFromRecents="true"')),
+    );
+    expect(mainActivityBlock, isNot(contains('android:taskAffinity=""')));
   });
+
+  test('Android manifest keeps lock-screen alarm activity out of recents', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    final alarmActivityBlock = _androidActivityBlock(
+      manifest,
+      '.AlarmActivity',
+    );
+
+    expect(
+      alarmActivityBlock,
+      contains('android:taskAffinity="com.teamproject.synced_alarm.alarm"'),
+    );
+    expect(alarmActivityBlock, contains('android:excludeFromRecents="true"'));
+  });
+
+  test(
+    'AlarmActivity hides app task when the lock-screen alarm is dismissed',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'AlarmActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('setShowWhenLocked(false)'));
+      expect(source, contains('setTurnScreenOn(false)'));
+      expect(source, contains('window.clearFlags'));
+      expect(source, contains('Intent.ACTION_MAIN'));
+      expect(source, contains('Intent.CATEGORY_HOME'));
+      expect(source, contains('overridePendingTransition(0, 0)'));
+    },
+  );
 
   test('alarm ringing screen starts and stops native vibration', () {
     final source = File(
@@ -412,6 +473,20 @@ void main() {
       expect(source, contains('optString("type") == "alarm"'));
       expect(source, contains('optString("purpose", "alarm") == "alarm"'));
       expect(source, isNot(contains('return hasExtra("payload")')));
+    },
+  );
+
+  test(
+    'LaunchRouterActivity clears the isolated alarm task before ringing',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'LaunchRouterActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('Intent.FLAG_ACTIVITY_NEW_TASK'));
+      expect(source, contains('Intent.FLAG_ACTIVITY_CLEAR_TASK'));
+      expect(source, isNot(contains('Intent.FLAG_ACTIVITY_CLEAR_TOP')));
     },
   );
 

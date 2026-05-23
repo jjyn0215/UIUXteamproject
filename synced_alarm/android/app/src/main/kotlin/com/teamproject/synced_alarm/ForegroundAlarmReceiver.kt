@@ -23,6 +23,7 @@ class ForegroundAlarmReceiver : BroadcastReceiver() {
             putExtra(SyncedAlarmFlutterActivity.EXTRA_ALARM_PAYLOAD, payload)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         context.startActivity(target)
     }
