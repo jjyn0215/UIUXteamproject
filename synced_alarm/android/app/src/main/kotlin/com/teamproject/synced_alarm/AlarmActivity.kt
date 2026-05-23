@@ -18,12 +18,18 @@ class AlarmActivity : SyncedAlarmFlutterActivity() {
     }
 
     override fun finishAlarmPresentation(): Boolean {
+        AlarmVibrationController.stop()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             finishAndRemoveTask()
         } else {
             finish()
         }
         return true
+    }
+
+    override fun onDestroy() {
+        AlarmVibrationController.stop()
+        super.onDestroy()
     }
 
     private fun enableAlarmPresentation() {
