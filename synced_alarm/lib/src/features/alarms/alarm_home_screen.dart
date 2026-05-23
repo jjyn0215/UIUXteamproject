@@ -411,10 +411,9 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
   ) async {
     try {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
-      await _finishActiveAlarmPresentation(alarm);
       await action();
-    } catch (_) {
-      // Silent catch to ensure alarm is closed safely
+    } finally {
+      await _finishActiveAlarmPresentation(alarm);
     }
   }
 
