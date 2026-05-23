@@ -17,7 +17,6 @@
             android:name=".LaunchRouterActivity"
             android:exported="true"
             android:noHistory="true"
-            android:excludeFromRecents="true"
             android:theme="@style/LaunchTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -28,7 +27,6 @@
             android:name=".MainActivity"
             android:exported="false"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"

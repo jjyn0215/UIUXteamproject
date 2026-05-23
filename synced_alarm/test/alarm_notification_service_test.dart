@@ -5,6 +5,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:synced_alarm/src/models/alarm.dart';
 import 'package:synced_alarm/src/platform/alarm_notification_service.dart';
 
+String _androidActivityBlock(String manifest, String activityName) {
+  final nameIndex = manifest.indexOf('android:name="$activityName"');
+  expect(nameIndex, isNot(-1), reason: '$activityName must be registered');
+  final endIndex = manifest.indexOf('</activity>', nameIndex);
+  expect(endIndex, isNot(-1), reason: '$activityName must close its tag');
+  return manifest.substring(nameIndex, endIndex);
+}
+
 void main() {
   test('uses a dedicated ringing channel with repeated sound flag', () {
     expect(
@@ -194,6 +202,45 @@ void main() {
     ).readAsStringSync();
 
     expect(manifest, contains('android:name=".ForegroundAlarmReceiver"'));
+  });
+
+  test('Android manifest keeps regular app launches visible in recents', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    final launchRouterBlock = _androidActivityBlock(
+      manifest,
+      '.LaunchRouterActivity',
+    );
+    final mainActivityBlock = _androidActivityBlock(manifest, '.MainActivity');
+
+    expect(
+      launchRouterBlock,
+      isNot(contains('android:excludeFromRecents="true"')),
+    );
+    expect(
+      mainActivityBlock,
+      isNot(contains('android:excludeFromRecents="true"')),
+    );
+    expect(mainActivityBlock, isNot(contains('android:taskAffinity=""')));
+  });
+
+  test('Android manifest keeps lock-screen alarm activity out of recents', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    final alarmActivityBlock = _androidActivityBlock(
+      manifest,
+      '.AlarmActivity',
+    );
+
+    expect(
+      alarmActivityBlock,
+      contains('android:taskAffinity="com.teamproject.synced_alarm.alarm"'),
+    );
+    expect(alarmActivityBlock, contains('android:excludeFromRecents="true"'));
   });
 
   test('native alarm vibration loops and can be cancelled', () {
