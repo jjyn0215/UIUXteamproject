@@ -184,7 +184,15 @@ class AppLocalizations {
       'local_demo_group': 'Local Demo',
       'cannot_change_group': 'Group cannot be changed after creation.',
       'default_group': 'Default Group',
-      'default_group_explanation': 'This group is selected by default when creating new alarms.',
+      'default_group_explanation':
+          'This group is selected by default when creating new alarms.',
+      'this_device': 'This device',
+      'unregister_device': 'Unregister Device',
+      'unregister_confirm':
+          'Are you sure you want to unregister this device? Sync for that device will stop.',
+      'group_details': 'Group Details',
+      'members': 'Members',
+      'registered_devices': 'Registered Devices',
     },
     'ko': {
       'app_title': '동기화 알람',
@@ -342,6 +350,12 @@ class AppLocalizations {
       'cannot_change_group': '생성 후에는 그룹을 변경할 수 없습니다.',
       'default_group': '기본 생성 그룹',
       'default_group_explanation': '새 알람을 생성할 때 기본으로 지정되는 그룹입니다.',
+      'this_device': '현재 기기',
+      'unregister_device': '기기 해제',
+      'unregister_confirm': '이 기기를 해제하시겠습니까? 해당 기기의 동기화가 중단됩니다.',
+      'group_details': '그룹 상세 정보',
+      'members': '참여 멤버',
+      'registered_devices': '등록된 기기',
     },
   };
 
@@ -493,6 +507,12 @@ class AppLocalizations {
   String get cannotChangeGroup => _getValue('cannot_change_group');
   String get defaultGroup => _getValue('default_group');
   String get defaultGroupExplanation => _getValue('default_group_explanation');
+  String get thisDevice => _getValue('this_device');
+  String get unregisterDevice => _getValue('unregister_device');
+  String get unregisterConfirm => _getValue('unregister_confirm');
+  String get groupDetails => _getValue('group_details');
+  String get members => _getValue('members');
+  String get registeredDevices => _getValue('registered_devices');
 
   String get mon => _getValue('mon');
   String get tue => _getValue('tue');

@@ -43,7 +43,10 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
   void initState() {
     super.initState();
     final alarm = widget.alarm;
-    _selectedGroupId = alarm?.groupId ?? ref.read(activeGroupProvider)?.groupId ?? defaultGroupId;
+    _selectedGroupId =
+        alarm?.groupId ??
+        ref.read(activeGroupProvider)?.groupId ??
+        defaultGroupId;
     _labelController = TextEditingController(text: alarm?.label ?? '');
     final now = DateTime.now();
     final oneMinuteLater = now.add(const Duration(minutes: 1));
@@ -130,13 +133,15 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
                   _SectionTitle(l10n.group),
                   Consumer(
                     builder: (context, ref, child) {
-                      final groups = ref.watch(userGroupsProvider).value ?? const [];
+                      final groups =
+                          ref.watch(userGroupsProvider).value ?? const [];
                       if (groups.isEmpty) {
                         return Text(
                           l10n.localDemoGroup,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
                         );
                       }
 
@@ -187,9 +192,12 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               l10n.cannotChangeGroup,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.outline,
+                                  ),
                             ),
                           ],
                         );

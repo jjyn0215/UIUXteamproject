@@ -174,25 +174,32 @@ final alarmsProvider = StreamProvider<List<Alarm>>((ref) {
       controller.add(merged);
     }
 
-    ref.watch(firebaseReadyProvider.future).then((_) {
-      if (controller.isClosed) return;
-      for (final group in groups) {
-        final stream = ref.read(alarmRepositoryProvider).watchAlarms(
-          groupId: group.groupId,
-          accessCode: '',
-        );
-        subscriptions[group.groupId] = stream.listen((alarms) {
-          latestAlarms[group.groupId] = alarms;
-          emitMerged();
-        }, onError: (err) {
-          debugPrint('Error watching alarms for group ${group.groupId}: $err');
+    ref
+        .watch(firebaseReadyProvider.future)
+        .then((_) {
+          if (controller.isClosed) return;
+          for (final group in groups) {
+            final stream = ref
+                .read(alarmRepositoryProvider)
+                .watchAlarms(groupId: group.groupId, accessCode: '');
+            subscriptions[group.groupId] = stream.listen(
+              (alarms) {
+                latestAlarms[group.groupId] = alarms;
+                emitMerged();
+              },
+              onError: (err) {
+                debugPrint(
+                  'Error watching alarms for group ${group.groupId}: $err',
+                );
+              },
+            );
+          }
+        })
+        .catchError((err) {
+          if (!controller.isClosed) {
+            controller.addError(err);
+          }
         });
-      }
-    }).catchError((err) {
-      if (!controller.isClosed) {
-        controller.addError(err);
-      }
-    });
 
     ref.onDispose(() {
       for (final sub in subscriptions.values) {
@@ -213,19 +220,22 @@ final alarmsProvider = StreamProvider<List<Alarm>>((ref) {
 final deviceRegistrationProvider = FutureProvider<List<DeviceRegistration>>((
   ref,
 ) async {
-  if (!ref.watch(cloudSyncEnabledProvider)) return const [];
-  final groups = ref.watch(userGroupsProvider).value ?? const [];
-  if (groups.isEmpty) return const [];
+  if (!useFirebase) return const [];
+
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const [];
 
   await ref.watch(firebaseReadyProvider.future);
   final deviceId = await ref.watch(deviceIdProvider.future);
   final registrar = FirebaseDeviceRegistrar();
   final registrations = <DeviceRegistration>[];
 
-  for (final group in groups) {
+  final groups = ref.watch(userGroupsProvider).value ?? const [];
+
+  if (groups.isEmpty) {
     try {
       final reg = await registrar.registerCurrentDevice(
-        groupId: group.groupId,
+        groupId: null,
         deviceId: deviceId,
         webVapidKey: firebaseMessagingVapidKey.isEmpty
             ? null
@@ -233,7 +243,24 @@ final deviceRegistrationProvider = FutureProvider<List<DeviceRegistration>>((
       );
       registrations.add(reg);
     } catch (e, st) {
-      debugPrint('Failed to register device for group ${group.groupId}: $e\n$st');
+      debugPrint('Failed to register user-only device: $e\n$st');
+      rethrow;
+    }
+  } else {
+    for (final group in groups) {
+      try {
+        final reg = await registrar.registerCurrentDevice(
+          groupId: group.groupId,
+          deviceId: deviceId,
+          webVapidKey: firebaseMessagingVapidKey.isEmpty
+              ? null
+              : firebaseMessagingVapidKey,
+        );
+        registrations.add(reg);
+      } catch (e, st) {
+        debugPrint('Failed to register device for group ${group.groupId}: $e\n$st');
+        rethrow;
+      }
     }
   }
   return registrations;
@@ -267,10 +294,17 @@ final syncStatusProvider = Provider<SyncStatus>((ref) {
       authState.hasError ||
       userGroups.hasError ||
       deviceRegistration.hasError) {
-    return const SyncStatus(
+    final error = firebaseReady.error ??
+        authState.error ??
+        userGroups.error ??
+        deviceRegistration.error;
+
+    return SyncStatus(
       type: SyncStatusType.error,
       label: 'Sync unavailable',
-      detail: 'Open settings and check account or network state.',
+      detail: error != null
+          ? 'Error: $error'
+          : 'Open settings and check account or network state.',
     );
   }
 
@@ -514,7 +548,6 @@ class AlarmListController {
       accessCode: '',
     );
   }
-
 
   Future<String> _deviceId() {
     if (!_ref.read(cloudSyncEnabledProvider)) {
@@ -876,12 +909,15 @@ final groupDevicesProvider = StreamProvider<List<DeviceRegistration>>((ref) {
           }).toList();
         });
 
-    subscriptions[group.groupId] = stream.listen((devices) {
-      latestDevices[group.groupId] = devices;
-      emitMerged();
-    }, onError: (err) {
-      debugPrint('Error watching devices for group ${group.groupId}: $err');
-    });
+    subscriptions[group.groupId] = stream.listen(
+      (devices) {
+        latestDevices[group.groupId] = devices;
+        emitMerged();
+      },
+      onError: (err) {
+        debugPrint('Error watching devices for group ${group.groupId}: $err');
+      },
+    );
   }
 
   ref.onDispose(() {
@@ -893,3 +929,61 @@ final groupDevicesProvider = StreamProvider<List<DeviceRegistration>>((ref) {
 
   return controller.stream;
 });
+
+final userDevicesProvider = StreamProvider<List<DeviceRegistration>>((ref) {
+  if (!useFirebase) {
+    return Stream.value(const []);
+  }
+
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) {
+    return Stream.value(const []);
+  }
+
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('devices')
+      .snapshots()
+      .map((snapshot) {
+        return snapshot.docs.map((doc) {
+          return DeviceRegistration.fromJson(doc.id, doc.data());
+        }).toList();
+      });
+});
+
+final groupDevicesFamilyProvider =
+    StreamProvider.family<List<DeviceRegistration>, String>((ref, groupId) {
+      if (!useFirebase) {
+        return Stream.value(const []);
+      }
+
+      return FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('devices')
+          .snapshots()
+          .map((snapshot) {
+            return snapshot.docs.map((doc) {
+              return DeviceRegistration.fromJson(doc.id, doc.data());
+            }).toList();
+          });
+    });
+
+final groupMembersFamilyProvider =
+    StreamProvider.family<List<GroupMember>, String>((ref, groupId) {
+      if (!useFirebase) {
+        return Stream.value(const []);
+      }
+
+      return FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .snapshots()
+          .map((snapshot) {
+            return snapshot.docs.map((doc) {
+              return GroupMember.fromJson(doc.id, doc.data());
+            }).toList();
+          });
+    });

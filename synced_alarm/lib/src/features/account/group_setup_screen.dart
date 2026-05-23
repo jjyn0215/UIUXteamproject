@@ -287,11 +287,12 @@ class _ExistingGroupsCard extends ConsumerWidget {
                         ),
                         child: Text(
                           l10n.defaultGroup,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
                         ),
                       ),
                     ],
@@ -302,6 +303,12 @@ class _ExistingGroupsCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.info_outline_rounded, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          _showGroupDetailsDialog(context, ref, group),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded, size: 16),
                       visualDensity: VisualDensity.compact,
@@ -314,7 +321,9 @@ class _ExistingGroupsCard extends ConsumerWidget {
                               children: [
                                 const Icon(
                                   Icons.check_circle_rounded,
-                                  color: Color(0xFFB9EFC5), // Stitch Primary Container 그린 컬러
+                                  color: Color(
+                                    0xFFB9EFC5,
+                                  ), // Stitch Primary Container 그린 컬러
                                   size: 20,
                                 ),
                                 const SizedBox(width: 10),
@@ -331,7 +340,9 @@ class _ExistingGroupsCard extends ConsumerWidget {
                               ],
                             ),
                             behavior: SnackBarBehavior.floating,
-                            backgroundColor: const Color(0xEE2C342E), // Stitch 메인 텍스트 다크 컬러(#2c342e) 기반 투명 배경
+                            backgroundColor: const Color(
+                              0xEE2C342E,
+                            ), // Stitch 메인 텍스트 다크 컬러(#2c342e) 기반 투명 배경
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -355,4 +366,273 @@ class _ExistingGroupsCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showGroupDetailsDialog(
+  BuildContext context,
+  WidgetRef ref,
+  AlarmGroupSummary group,
+) {
+  final l10n = AppLocalizations.of(context);
+  final theme = Theme.of(context);
+
+  showDialog<void>(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 560),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        l10n.groupDetails,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(context).pop(),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  '${l10n.groupName}: ${group.name}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${l10n.groupId}: ${group.groupId}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.md),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final membersVal = ref.watch(
+                          groupMembersFamilyProvider(group.groupId),
+                        );
+                        final devicesVal = ref.watch(
+                          groupDevicesFamilyProvider(group.groupId),
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.members,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            membersVal.when(
+                              data: (members) {
+                                if (members.isEmpty) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: AppSpacing.sm,
+                                    ),
+                                    child: Text('참여 중인 멤버가 없습니다.'),
+                                  );
+                                }
+                                return ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: members.length,
+                                  itemBuilder: (context, index) {
+                                    final member = members[index];
+                                    final isOwner = member.role == 'owner';
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: CircleAvatar(
+                                        backgroundColor: isOwner
+                                            ? theme.colorScheme.primaryContainer
+                                            : theme
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                        child: Icon(
+                                          isOwner
+                                              ? Icons.star_rounded
+                                              : Icons.person_rounded,
+                                          color: isOwner
+                                              ? theme.colorScheme.primary
+                                              : theme.colorScheme.outline,
+                                        ),
+                                      ),
+                                      title: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              member.displayName,
+                                              style: theme.textTheme.bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isOwner) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: theme
+                                                    .colorScheme
+                                                    .primaryContainer,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                '방장',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.green,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      subtitle: Text(
+                                        member.email,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.outline,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              loading: () => const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(AppSpacing.md),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (err, _) => Text('에러: $err'),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            const Divider(height: 1),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              l10n.registeredDevices,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            devicesVal.when(
+                              data: (devices) {
+                                if (devices.isEmpty) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: AppSpacing.sm,
+                                    ),
+                                    child: Text('등록된 기기가 없습니다.'),
+                                  );
+                                }
+                                return ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: devices.length,
+                                  itemBuilder: (context, index) {
+                                    final device = devices[index];
+                                    final isAndroid =
+                                        device.platform.toLowerCase() ==
+                                        'android';
+                                    final isIOS =
+                                        device.platform.toLowerCase() == 'ios';
+
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(
+                                        isAndroid
+                                            ? Icons.android_rounded
+                                            : (isIOS
+                                                  ? Icons.phone_iphone_rounded
+                                                  : Icons.computer_rounded),
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      title: Text(
+                                        device.displayName,
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      subtitle: Text(
+                                        '${l10n.lastSynced}: ${_formatLastSeen(device.lastSeenAt, l10n)}',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.outline,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              loading: () => const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(AppSpacing.md),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              error: (err, _) => Text('에러: $err'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+String _formatLastSeen(DateTime dt, AppLocalizations l10n) {
+  final localDt = dt.toLocal();
+  final hour = localDt.hour;
+  final minute = localDt.minute.toString().padLeft(2, '0');
+  final period = hour < 12 ? 'AM' : 'PM';
+  final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+  return '${localDt.month}/${localDt.day} $hour12:$minute $period';
 }

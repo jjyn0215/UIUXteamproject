@@ -15,8 +15,6 @@ class LocalDemoAlarmRepository implements AlarmRepository {
   List<Alarm> _alarms = const [];
   bool _loaded = false;
 
-
-
   @override
   Stream<List<Alarm>> watchAlarms({
     required String groupId,

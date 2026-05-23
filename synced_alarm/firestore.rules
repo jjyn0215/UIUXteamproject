@@ -112,6 +112,22 @@ service cloud.firestore {
         && request.resource.data.notificationsEnabled is bool;
     }
 
+    function validUserDevice() {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'groupId',
+          'deviceId',
+          'platform',
+          'displayName',
+          'fcmToken',
+          'lastSeenAt',
+          'notificationsEnabled'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.platform is string
+        && request.resource.data.notificationsEnabled is bool;
+    }
+
     match /groups/{groupId} {
       allow read: if isGroupMember(groupId);
       allow create, update, delete: if false;
@@ -151,6 +167,12 @@ service cloud.firestore {
       match /groups/{groupId} {
         allow read: if isSelf(uid);
         allow create, update, delete: if false;
+      }
+
+      match /devices/{deviceId} {
+        allow read: if isSelf(uid);
+        allow create, update: if isSelf(uid) && validUserDevice();
+        allow delete: if isSelf(uid);
       }
     }
 

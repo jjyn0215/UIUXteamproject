@@ -24,16 +24,10 @@ class AccountGate extends ConsumerWidget {
           return const PermissionGuideScreen();
         }
       },
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-      error: (err, stack) => Scaffold(
-        body: Center(
-          child: Text('권한 확인 오류: $err'),
-        ),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) =>
+          Scaffold(body: Center(child: Text('권한 확인 오류: $err'))),
     );
   }
 }

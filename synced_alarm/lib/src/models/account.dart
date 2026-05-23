@@ -43,3 +43,26 @@ class AlarmGroupSummary {
   final String name;
   final String role;
 }
+
+class GroupMember {
+  const GroupMember({
+    required this.uid,
+    required this.email,
+    required this.displayName,
+    required this.role,
+  });
+
+  factory GroupMember.fromJson(String uid, Map<String, Object?> json) {
+    return GroupMember(
+      uid: uid,
+      email: json['email'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? 'User',
+      role: json['role'] as String? ?? 'member',
+    );
+  }
+
+  final String uid;
+  final String email;
+  final String displayName;
+  final String role;
+}

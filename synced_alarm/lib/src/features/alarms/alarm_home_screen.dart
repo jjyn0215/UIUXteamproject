@@ -573,7 +573,9 @@ class _AlarmCardState extends ConsumerState<_AlarmCard> {
       (g) => g.groupId == alarm.groupId,
       orElse: () => AlarmGroupSummary(
         groupId: alarm.groupId,
-        name: alarm.groupId == defaultGroupId ? l10n.localDemoGroup : alarm.groupId,
+        name: alarm.groupId == defaultGroupId
+            ? l10n.localDemoGroup
+            : alarm.groupId,
         role: 'member',
       ),
     );
@@ -720,9 +722,7 @@ class _AlarmCardState extends ConsumerState<_AlarmCard> {
                               alarm.maxSnoozeCount,
                               _formatSnoozeTime(alarm.snoozeUntil!),
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: SereneWakeColors.primary,
                                   fontWeight: FontWeight.w700,

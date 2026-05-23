@@ -6,11 +6,9 @@ import 'alarm_repository.dart';
 import 'firebase_operation_timeout.dart';
 
 class FirebaseAlarmRepository implements AlarmRepository {
-  FirebaseAlarmRepository({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  }) : _auth = auth ?? FirebaseAuth.instance,
-       _firestore = firestore ?? FirebaseFirestore.instance;
+  FirebaseAlarmRepository({FirebaseAuth? auth, FirebaseFirestore? firestore})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;

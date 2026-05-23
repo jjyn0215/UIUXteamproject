@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/app_providers.dart';
+import '../../data/firebase_device_registrar.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/account.dart';
+import '../../models/device_registration.dart';
 import 'group_setup_screen.dart';
 
 class AccountSettingsScreen extends ConsumerWidget {
@@ -265,17 +267,28 @@ class _NicknameEditCardState extends ConsumerState<_NicknameEditCard> {
   }
 }
 
-class _SyncedDevicesGroup extends ConsumerWidget {
+class _SyncedDevicesGroup extends ConsumerStatefulWidget {
   const _SyncedDevicesGroup();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final devicesVal = ref.watch(groupDevicesProvider);
+  ConsumerState<_SyncedDevicesGroup> createState() =>
+      _SyncedDevicesGroupState();
+}
+
+class _SyncedDevicesGroupState extends ConsumerState<_SyncedDevicesGroup> {
+  bool _deleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final devicesVal = ref.watch(userDevicesProvider);
+    final currentDeviceIdVal = ref.watch(deviceIdProvider);
     final l10n = AppLocalizations.of(context);
 
     return devicesVal.when(
       data: (devices) {
         if (devices.isEmpty) return const SizedBox.shrink();
+
+        final currentDeviceId = currentDeviceIdVal.value;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,7 +299,7 @@ class _SyncedDevicesGroup extends ConsumerWidget {
                 bottom: AppSpacing.sm,
               ),
               child: Text(
-                l10n.syncedDevices,
+                '${l10n.registeredDevices} (${devices.length})',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                   fontWeight: FontWeight.w800,
@@ -324,10 +337,52 @@ class _SyncedDevicesGroup extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  devices[i].displayName,
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        devices[i].displayName,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (devices[i].id == currentDeviceId) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primaryContainer,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          l10n.thisDevice,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 9,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -342,6 +397,16 @@ class _SyncedDevicesGroup extends ConsumerWidget {
                               ],
                             ),
                           ),
+                          if (devices[i].id != currentDeviceId) ...[
+                            const SizedBox(width: AppSpacing.sm),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              color: Theme.of(context).colorScheme.error,
+                              onPressed: _deleting
+                                  ? null
+                                  : () => _confirmUnregister(devices[i]),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -355,6 +420,55 @@ class _SyncedDevicesGroup extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, st) => const SizedBox.shrink(),
     );
+  }
+
+  Future<void> _confirmUnregister(DeviceRegistration device) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.unregisterDevice),
+        content: Text(l10n.unregisterConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _deleting = true);
+      try {
+        final groups = ref.read(userGroupsProvider).value ?? const [];
+        final groupIds = groups.map((g) => g.groupId).toList();
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseDeviceRegistrar().deleteDevice(
+            uid: user.uid,
+            deviceId: device.id,
+            groupIds: groupIds,
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('기기 해제 실패: $e')));
+      } finally {
+        if (mounted) {
+          setState(() => _deleting = false);
+        }
+      }
+    }
   }
 
   String _formatLastSeen(DateTime dt, AppLocalizations l10n) {
@@ -392,18 +506,18 @@ class _GroupManagementCard extends ConsumerWidget {
                 Text(
                   l10n.sharedGroup,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 if (groups.isEmpty) ...[
                   Text(
                     l10n.noGroup,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: Theme.of(context).colorScheme.outline,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ] else ...[
                   Wrap(
@@ -417,16 +531,19 @@ class _GroupManagementCard extends ConsumerWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest
-                                .withAlpha(80),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest.withAlpha(80),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: activeGroup?.groupId == group.groupId
                                   ? Colors.amber.withAlpha(150)
-                                  : Theme.of(context).colorScheme.outlineVariant,
-                              width: activeGroup?.groupId == group.groupId ? 1.5 : 1,
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant,
+                              width: activeGroup?.groupId == group.groupId
+                                  ? 1.5
+                                  : 1,
                             ),
                           ),
                           child: Row(
@@ -449,13 +566,20 @@ class _GroupManagementCard extends ConsumerWidget {
                               ],
                               Text(
                                 group.name,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      fontWeight: activeGroup?.groupId == group.groupId
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      fontWeight:
+                                          activeGroup?.groupId == group.groupId
                                           ? FontWeight.w800
                                           : FontWeight.w600,
-                                      color: activeGroup?.groupId == group.groupId
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context).textTheme.bodyMedium?.color,
+                                      color:
+                                          activeGroup?.groupId == group.groupId
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium?.color,
                                     ),
                               ),
                             ],
@@ -471,16 +595,15 @@ class _GroupManagementCard extends ConsumerWidget {
           ListTile(
             title: Text(
               l10n.groupMgmt,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             subtitle: Text(
               l10n.createJoinSwitch,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
             trailing: Icon(
               Icons.chevron_right_rounded,
