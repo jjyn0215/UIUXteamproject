@@ -411,9 +411,10 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
   ) async {
     try {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
-      await action();
-    } finally {
       await _finishActiveAlarmPresentation(alarm);
+      await action();
+    } catch (_) {
+      // Silent catch to ensure alarm is closed safely
     }
   }
 
@@ -421,10 +422,8 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     await AlarmTaskController.stopAlarmVibration();
     final ringingAlarm = ref.read(ringingAlarmProvider);
     if (ringingAlarm?.id != alarm.id) return;
-    final finished = await AlarmTaskController.finishAlarmPresentation();
-    if (!finished) {
-      ref.read(ringingAlarmProvider.notifier).clear();
-    }
+    await AlarmTaskController.finishAlarmPresentation();
+    ref.read(ringingAlarmProvider.notifier).clear();
   }
 }
 
@@ -743,6 +742,10 @@ class _AlarmCardState extends ConsumerState<_AlarmCard> {
                   const SizedBox(width: AppSpacing.sm),
                   Switch(
                     value: alarm.enabled,
+                    activeThumbColor: Theme.of(context).colorScheme.primary,
+                    activeTrackColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
                     onChanged: _busy
                         ? null
                         : (enabled) async {
