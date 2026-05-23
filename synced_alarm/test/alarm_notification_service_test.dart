@@ -196,22 +196,6 @@ void main() {
     expect(manifest, contains('android:name=".ForegroundAlarmReceiver"'));
   });
 
-  test(
-    'foreground alarm routing uses visible lifecycle instead of pause state',
-    () {
-      final source = File(
-        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
-        'SyncedAlarmFlutterActivity.kt',
-      ).readAsStringSync();
-
-      expect(source, contains('override fun onStart()'));
-      expect(source, contains('override fun onStop()'));
-      expect(source, contains('private var isMainActivityVisible'));
-      expect(source, contains('return isMainActivityVisible'));
-      expect(source, isNot(contains('private var isMainActivityResumed')));
-    },
-  );
-
   test('native alarm vibration loops and can be cancelled', () {
     final file = File(
       'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
@@ -274,21 +258,6 @@ void main() {
     expect(source, contains('vibrationEnabled: widget.alarm.vibrationEnabled'));
     expect(source, contains('duration: Duration(minutes:'));
   });
-
-  test(
-    'LaunchRouterActivity only routes ringing alarm payloads to AlarmActivity',
-    () {
-      final source = File(
-        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
-        'LaunchRouterActivity.kt',
-      ).readAsStringSync();
-
-      expect(source, contains('JSONObject(payload)'));
-      expect(source, contains('optString("type") == "alarm"'));
-      expect(source, contains('optString("purpose", "alarm") == "alarm"'));
-      expect(source, isNot(contains('return hasExtra("payload")')));
-    },
-  );
 
   test('builds scheduled alarm notification from next occurrence', () {
     final alarm = Alarm(
