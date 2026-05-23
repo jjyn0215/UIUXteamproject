@@ -367,59 +367,103 @@ class _SyncedDevicesGroup extends ConsumerWidget {
   }
 }
 
-class _GroupManagementCard extends StatelessWidget {
+class _GroupManagementCard extends ConsumerWidget {
   const _GroupManagementCard({required this.activeGroup});
 
   final AlarmGroupSummary? activeGroup;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final groups = ref.watch(userGroupsProvider).value ?? const [];
+
     return Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Row(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Text(
+                  l10n.sharedGroup,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (groups.isEmpty) ...[
+                  Text(
+                    l10n.noGroup,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ] else ...[
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
                     children: [
-                      Text(
-                        l10n.sharedGroup,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                              fontWeight: FontWeight.w700,
+                      for (final group in groups)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withAlpha(80),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: activeGroup?.groupId == group.groupId
+                                  ? Colors.amber.withAlpha(150)
+                                  : Theme.of(context).colorScheme.outlineVariant,
+                              width: activeGroup?.groupId == group.groupId ? 1.5 : 1,
                             ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        activeGroup?.name ?? l10n.noGroup,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (activeGroup != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '${l10n.groupId}: ${activeGroup!.groupId}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.outline,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (activeGroup?.groupId == group.groupId) ...[
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 4),
+                              ] else ...[
+                                Icon(
+                                  Icons.groups_rounded,
+                                  size: 14,
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                group.name,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      fontWeight: activeGroup?.groupId == group.groupId
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      color: activeGroup?.groupId == group.groupId
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Theme.of(context).textTheme.bodyMedium?.color,
+                                    ),
                               ),
+                            ],
+                          ),
                         ),
-                      ],
                     ],
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -427,15 +471,16 @@ class _GroupManagementCard extends StatelessWidget {
           ListTile(
             title: Text(
               l10n.groupMgmt,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
             subtitle: Text(
               l10n.createJoinSwitch,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
             ),
             trailing: Icon(
               Icons.chevron_right_rounded,

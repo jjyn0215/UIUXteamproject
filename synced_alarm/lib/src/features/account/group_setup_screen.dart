@@ -249,25 +249,75 @@ class _ExistingGroupsCard extends ConsumerWidget {
                 letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.defaultGroupExplanation,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             for (final group in groups)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
                   activeGroup?.groupId == group.groupId
-                      ? Icons.check_circle_rounded
-                      : Icons.groups_rounded,
-                  color: SereneWakeColors.primary,
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                  color: activeGroup?.groupId == group.groupId
+                      ? Colors.amber
+                      : Theme.of(context).colorScheme.outline,
                 ),
                 title: Text(group.name),
                 subtitle: Text(group.groupId),
-                trailing: Text(group.role),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (activeGroup?.groupId == group.groupId) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          l10n.defaultGroup,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                    Text(
+                      group.role,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
                 onTap: busy
                     ? null
                     : () {
                         ref
                             .read(accountRepositoryProvider)
                             .setActiveGroup(group.groupId);
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${group.name}이(가) 기본 생성 그룹으로 지정되었습니다.',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+
                         if (Navigator.of(context).canPop()) {
                           Navigator.of(context).pop();
                         }

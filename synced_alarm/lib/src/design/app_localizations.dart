@@ -183,6 +183,8 @@ class AppLocalizations {
       'select_group': 'Select Group',
       'local_demo_group': 'Local Demo',
       'cannot_change_group': 'Group cannot be changed after creation.',
+      'default_group': 'Default Group',
+      'default_group_explanation': 'This group is selected by default when creating new alarms.',
     },
     'ko': {
       'app_title': '동기화 알람',
@@ -338,6 +340,8 @@ class AppLocalizations {
       'select_group': '그룹 선택',
       'local_demo_group': '로컬 데모',
       'cannot_change_group': '생성 후에는 그룹을 변경할 수 없습니다.',
+      'default_group': '기본 생성 그룹',
+      'default_group_explanation': '새 알람을 생성할 때 기본으로 지정되는 그룹입니다.',
     },
   };
 
@@ -487,6 +491,8 @@ class AppLocalizations {
   String get selectGroup => _getValue('select_group');
   String get localDemoGroup => _getValue('local_demo_group');
   String get cannotChangeGroup => _getValue('cannot_change_group');
+  String get defaultGroup => _getValue('default_group');
+  String get defaultGroupExplanation => _getValue('default_group_explanation');
 
   String get mon => _getValue('mon');
   String get tue => _getValue('tue');
