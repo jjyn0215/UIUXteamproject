@@ -172,6 +172,55 @@ void main() {
   });
 
   test(
+    'foreground alarm routing uses visible lifecycle instead of pause state',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'SyncedAlarmFlutterActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('override fun onStart()'));
+      expect(source, contains('override fun onStop()'));
+      expect(source, contains('private var isMainActivityVisible'));
+      expect(source, contains('return isMainActivityVisible'));
+      expect(source, isNot(contains('private var isMainActivityResumed')));
+    },
+  );
+
+  test('native alarm vibration loops and can be cancelled', () {
+    final file = File(
+      'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+      'AlarmVibrationController.kt',
+    );
+
+    expect(file.existsSync(), isTrue);
+    final source = file.readAsStringSync();
+    expect(source, contains('VibrationEffect.createWaveform'));
+    expect(source, contains('.vibrate'));
+    expect(source, contains('.cancel()'));
+    expect(source, contains('postDelayed'));
+  });
+
+  test('alarm task channel exposes vibration controls', () {
+    final nativeSource = File(
+      'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+      'SyncedAlarmFlutterActivity.kt',
+    ).readAsStringSync();
+    final dartSource = File(
+      'lib/src/platform/alarm_task_controller.dart',
+    ).readAsStringSync();
+
+    expect(nativeSource, contains('"startAlarmVibration"'));
+    expect(nativeSource, contains('"stopAlarmVibration"'));
+    expect(nativeSource, contains('AlarmVibrationController.start'));
+    expect(nativeSource, contains('AlarmVibrationController.stop'));
+    expect(dartSource, contains('startAlarmVibration'));
+    expect(dartSource, contains('stopAlarmVibration'));
+    expect(dartSource, contains('ringDurationMillis'));
+    expect(dartSource, contains('vibrationEnabled'));
+  });
+
+  test(
     'Android manifest routes full-screen alarms to a dedicated activity',
     () {
       final manifest = File(
@@ -187,6 +236,32 @@ void main() {
       );
       expect(manifest, contains('android:showWhenLocked="true"'));
       expect(manifest, contains('android:turnScreenOn="true"'));
+    },
+  );
+
+  test('alarm ringing screen starts and stops native vibration', () {
+    final source = File(
+      'lib/src/features/alarms/alarm_ring_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('AlarmTaskController.startAlarmVibration'));
+    expect(source, contains('AlarmTaskController.stopAlarmVibration'));
+    expect(source, contains('vibrationEnabled: widget.alarm.vibrationEnabled'));
+    expect(source, contains('duration: Duration(minutes:'));
+  });
+
+  test(
+    'LaunchRouterActivity only routes ringing alarm payloads to AlarmActivity',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+        'LaunchRouterActivity.kt',
+      ).readAsStringSync();
+
+      expect(source, contains('JSONObject(payload)'));
+      expect(source, contains('optString("type") == "alarm"'));
+      expect(source, contains('optString("purpose", "alarm") == "alarm"'));
+      expect(source, isNot(contains('return hasExtra("payload")')));
     },
   );
 

@@ -25,6 +25,31 @@ class AlarmTaskController {
     }
   }
 
+  static Future<bool> startAlarmVibration({
+    required bool vibrationEnabled,
+    required Duration duration,
+  }) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('startAlarmVibration', {
+            'vibrationEnabled': vibrationEnabled,
+            'ringDurationMillis': duration.inMilliseconds,
+          }) ??
+          false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> stopAlarmVibration() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('stopAlarmVibration') ?? false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   static Future<bool> openNotificationSettings() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
     try {

@@ -252,6 +252,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     if (alarm == null) return false;
 
     _pendingAlarmAction = null;
+    await AlarmTaskController.stopAlarmVibration();
     await _dueTickTracker.markHandled(alarm, DateTime.now());
     final controller = ref.read(alarmListControllerProvider);
     switch (action.type) {

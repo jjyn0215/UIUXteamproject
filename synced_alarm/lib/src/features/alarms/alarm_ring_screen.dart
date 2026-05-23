@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/alarm.dart';
+import '../../platform/alarm_task_controller.dart';
 
 class AlarmRingScreen extends StatefulWidget {
   const AlarmRingScreen({
@@ -28,7 +29,31 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   @override
   void initState() {
     super.initState();
+    _startAlarmVibration();
     _startAutoSnoozeTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant AlarmRingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.alarm.id != widget.alarm.id ||
+        oldWidget.alarm.vibrationEnabled != widget.alarm.vibrationEnabled ||
+        oldWidget.alarm.ringDurationMinutes !=
+            widget.alarm.ringDurationMinutes) {
+      unawaited(AlarmTaskController.stopAlarmVibration());
+      _autoSnoozeTimer?.cancel();
+      _startAlarmVibration();
+      _startAutoSnoozeTimer();
+    }
+  }
+
+  void _startAlarmVibration() {
+    unawaited(
+      AlarmTaskController.startAlarmVibration(
+        vibrationEnabled: widget.alarm.vibrationEnabled,
+        duration: Duration(minutes: widget.alarm.ringDurationMinutes),
+      ),
+    );
   }
 
   void _startAutoSnoozeTimer() {
@@ -43,6 +68,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   @override
   void dispose() {
     _autoSnoozeTimer?.cancel();
+    unawaited(AlarmTaskController.stopAlarmVibration());
     super.dispose();
   }
 
@@ -134,6 +160,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
 
   Future<void> _run(Future<void> Function() action) async {
     _autoSnoozeTimer?.cancel();
+    await AlarmTaskController.stopAlarmVibration();
     setState(() => _busy = true);
     await action();
     if (mounted) setState(() => _busy = false);

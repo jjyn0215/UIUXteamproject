@@ -32,7 +32,26 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "finishAlarmPresentation" -> {
+                    AlarmVibrationController.stop()
                     result.success(finishAlarmPresentation())
+                }
+                "startAlarmVibration" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val vibrationEnabled = args
+                        ?.get("vibrationEnabled") as? Boolean ?: true
+                    val ringDurationMillis = (args
+                        ?.get("ringDurationMillis") as? Number)
+                        ?.toLong() ?: DEFAULT_RING_DURATION_MILLIS
+                    AlarmVibrationController.start(
+                        applicationContext,
+                        vibrationEnabled,
+                        ringDurationMillis,
+                    )
+                    result.success(true)
+                }
+                "stopAlarmVibration" -> {
+                    AlarmVibrationController.stop()
+                    result.success(true)
                 }
                 "openNotificationSettings" -> {
                     val intent = Intent().apply {
@@ -140,6 +159,7 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
         const val ACTION_FOREGROUND_ALARM_TRIGGER =
             "com.teamproject.synced_alarm.FOREGROUND_ALARM_TRIGGER"
         const val EXTRA_ALARM_PAYLOAD = "alarm_payload"
+        private const val DEFAULT_RING_DURATION_MILLIS = 5L * 60L * 1000L
 
         @Volatile
         private var resumedActivityName: String? = null
