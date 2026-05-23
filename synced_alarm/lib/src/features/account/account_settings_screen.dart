@@ -18,7 +18,6 @@ class AccountSettingsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: SereneWakeColors.background,
       appBar: AppBar(
         title: Text(
           l10n.accountSettings,
@@ -64,7 +63,6 @@ class _ProfileCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
-      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Row(
@@ -197,7 +195,6 @@ class _NicknameEditCardState extends ConsumerState<_NicknameEditCard> {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
-      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
@@ -235,8 +232,8 @@ class _NicknameEditCardState extends ConsumerState<_NicknameEditCard> {
                 ElevatedButton(
                   onPressed: (_isChanged && !_isLoading) ? _saveNickname : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: SereneWakeColors.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     disabledBackgroundColor: Theme.of(
                       context,
                     ).colorScheme.surfaceContainerHighest,
@@ -303,7 +300,6 @@ class _SyncedDevicesGroup extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               elevation: 0,
-              color: Colors.white,
               child: Column(
                 children: [
                   for (var i = 0; i < devices.length; i++) ...[
@@ -383,7 +379,6 @@ class _GroupManagementCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
-      color: Colors.white,
       child: Column(
         children: [
           Padding(
@@ -560,7 +555,6 @@ class _AccountActionsCard extends ConsumerWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
-      color: Colors.white,
       child: Column(
         children: [
           ListTile(

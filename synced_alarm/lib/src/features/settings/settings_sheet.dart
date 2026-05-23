@@ -79,50 +79,25 @@ class SettingsPanel extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
             ],
-            _ProfileHeader(profile: profile, activeGroup: activeGroup),
-            const SizedBox(height: AppSpacing.lg),
-            _SettingsSectionLabel(l10n.syncAccount),
-            _SettingsGroup(
-              children: [
-                if (!useFirebase)
-                  _SettingsRow(
-                    title: l10n.account,
-                    value: l10n.localOnly,
-                    detail: l10n.firebaseModeDisabled,
-                  )
-                else if (!signedIn)
-                  _SettingsRow(
-                    title: l10n.account,
-                    value: l10n.localMode,
-                    detail: l10n.signInToSync,
-                    trailing: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const AuthScreen(),
-                          ),
-                        );
-                      },
-                      child: Text(l10n.signIn),
+            _ProfileHeader(
+              profile: profile,
+              activeGroup: activeGroup,
+              onTap: () {
+                if (!useFirebase) return;
+                if (!signedIn) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AuthScreen(),
                     ),
-                  )
-                else
-                  _SettingsRow(
-                    title: l10n.account,
-                    value:
-                        profile?.displayName ?? profile?.email ?? l10n.active,
-                    trailing: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const AccountSettingsScreen(),
-                          ),
-                        );
-                      },
-                      child: Text(l10n.open),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AccountSettingsScreen(),
                     ),
-                  ),
-              ],
+                  );
+                }
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             _SettingsSectionLabel(l10n.alarmDefaults),
@@ -153,54 +128,71 @@ class SettingsPanel extends ConsumerWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.profile, required this.activeGroup});
+  const _ProfileHeader({
+    required this.profile,
+    required this.activeGroup,
+    this.onTap,
+  });
 
   final AppUserProfile? profile;
   final AlarmGroupSummary? activeGroup;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Row(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            Icons.alarm_rounded,
-            color: Theme.of(context).colorScheme.primary,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                activeGroup?.name ?? profile?.displayName ?? l10n.localAlarms,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
-                ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 2),
-              Text(
-                profile?.email ??
-                    activeGroup?.groupId ??
-                    l10n.noAccountRequired,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              child: Icon(
+                Icons.alarm_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 26,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activeGroup?.name ?? profile?.displayName ?? l10n.localAlarms,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    profile?.email ??
+                        activeGroup?.groupId ??
+                        l10n.noAccountRequired,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? SereneWakeColors.outlineDark : SereneWakeColors.outline,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -230,13 +222,14 @@ class _SettingsSectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: AppSpacing.xs,
         bottom: AppSpacing.sm,
-        top: AppSpacing.sm,
+        top: AppSpacing.md,
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Theme.of(context).colorScheme.outline,
-          fontWeight: FontWeight.w800,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w900,
+          fontSize: 15,
           letterSpacing: 0,
         ),
       ),
