@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/app_providers.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
+import '../../models/account.dart';
 import '../../models/alarm.dart';
 import '../../platform/alarm_task_controller.dart';
 import '../../platform/alarm_notification_service.dart';
@@ -540,6 +541,25 @@ class _AlarmCard extends ConsumerStatefulWidget {
 class _AlarmCardState extends ConsumerState<_AlarmCard> {
   bool _busy = false;
 
+  Widget _buildGroupBadge(BuildContext context, String groupName) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(80),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        groupName,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -547,6 +567,16 @@ class _AlarmCardState extends ConsumerState<_AlarmCard> {
     final subtitle = alarm.enabled
         ? _formatNext(alarm.nextOccurrence(widget.now), widget.now, l10n)
         : l10n.off;
+
+    final groups = ref.watch(userGroupsProvider).value ?? const [];
+    final group = groups.firstWhere(
+      (g) => g.groupId == alarm.groupId,
+      orElse: () => AlarmGroupSummary(
+        groupId: alarm.groupId,
+        name: alarm.groupId == defaultGroupId ? l10n.localDemoGroup : alarm.groupId,
+        role: 'member',
+      ),
+    );
 
     return Card(
       child: InkWell(
@@ -563,6 +593,7 @@ class _AlarmCardState extends ConsumerState<_AlarmCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _buildGroupBadge(context, group.name),
                         Text(
                           alarm.timeLabel,
                           style: Theme.of(context).textTheme.headlineMedium

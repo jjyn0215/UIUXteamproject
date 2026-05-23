@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -157,14 +158,50 @@ final deviceIdProvider = FutureProvider<String>((ref) async {
 
 final alarmsProvider = StreamProvider<List<Alarm>>((ref) {
   if (ref.watch(cloudSyncEnabledProvider)) {
-    final activeGroup = ref.watch(activeGroupProvider)!;
-    return ref.watch(firebaseReadyProvider.future).asStream().asyncExpand((_) {
-      final repository = ref.watch(alarmRepositoryProvider);
-      return repository.watchAlarms(
-        groupId: activeGroup.groupId,
-        accessCode: '',
-      );
+    final groups = ref.watch(userGroupsProvider).value ?? const [];
+    if (groups.isEmpty) {
+      return Stream.value(const <Alarm>[]);
+    }
+
+    final controller = StreamController<List<Alarm>>();
+    final subscriptions = <String, StreamSubscription>{};
+    final latestAlarms = <String, List<Alarm>>{};
+
+    void emitMerged() {
+      if (controller.isClosed) return;
+      final merged = latestAlarms.values.expand((list) => list).toList();
+      merged.sort((a, b) => a.timeOfDayMinutes.compareTo(b.timeOfDayMinutes));
+      controller.add(merged);
+    }
+
+    ref.watch(firebaseReadyProvider.future).then((_) {
+      if (controller.isClosed) return;
+      for (final group in groups) {
+        final stream = ref.read(alarmRepositoryProvider).watchAlarms(
+          groupId: group.groupId,
+          accessCode: '',
+        );
+        subscriptions[group.groupId] = stream.listen((alarms) {
+          latestAlarms[group.groupId] = alarms;
+          emitMerged();
+        }, onError: (err) {
+          debugPrint('Error watching alarms for group ${group.groupId}: $err');
+        });
+      }
+    }).catchError((err) {
+      if (!controller.isClosed) {
+        controller.addError(err);
+      }
     });
+
+    ref.onDispose(() {
+      for (final sub in subscriptions.values) {
+        sub.cancel();
+      }
+      controller.close();
+    });
+
+    return controller.stream;
   }
   final repository = ref.watch(alarmRepositoryProvider);
   return repository.watchAlarms(
@@ -173,20 +210,33 @@ final alarmsProvider = StreamProvider<List<Alarm>>((ref) {
   );
 });
 
-final deviceRegistrationProvider = FutureProvider<DeviceRegistration?>((
+final deviceRegistrationProvider = FutureProvider<List<DeviceRegistration>>((
   ref,
 ) async {
-  if (!ref.watch(cloudSyncEnabledProvider)) return null;
-  final activeGroup = ref.watch(activeGroupProvider)!;
+  if (!ref.watch(cloudSyncEnabledProvider)) return const [];
+  final groups = ref.watch(userGroupsProvider).value ?? const [];
+  if (groups.isEmpty) return const [];
+
   await ref.watch(firebaseReadyProvider.future);
   final deviceId = await ref.watch(deviceIdProvider.future);
-  return FirebaseDeviceRegistrar().registerCurrentDevice(
-    groupId: activeGroup.groupId,
-    deviceId: deviceId,
-    webVapidKey: firebaseMessagingVapidKey.isEmpty
-        ? null
-        : firebaseMessagingVapidKey,
-  );
+  final registrar = FirebaseDeviceRegistrar();
+  final registrations = <DeviceRegistration>[];
+
+  for (final group in groups) {
+    try {
+      final reg = await registrar.registerCurrentDevice(
+        groupId: group.groupId,
+        deviceId: deviceId,
+        webVapidKey: firebaseMessagingVapidKey.isEmpty
+            ? null
+            : firebaseMessagingVapidKey,
+      );
+      registrations.add(reg);
+    } catch (e, st) {
+      debugPrint('Failed to register device for group ${group.groupId}: $e\n$st');
+    }
+  }
+  return registrations;
 });
 
 enum SyncStatusType { local, needsGroup, syncing, active, error }
@@ -303,6 +353,7 @@ class AlarmListController {
   Future<void> createAlarm({
     required String label,
     required int timeOfDayMinutes,
+    required String groupId,
     Set<int>? repeatWeekdays,
     int? ringDurationMinutes,
     bool? soundEnabled,
@@ -311,10 +362,9 @@ class AlarmListController {
     int? maxSnoozeCount,
   }) async {
     await _ensureReady();
-    final activeGroup = await _activeGroup();
     final deviceId = await _deviceId();
     final alarm = Alarm.create(
-      groupId: activeGroup.groupId,
+      groupId: groupId,
       label: label,
       time: _timeFromMinutes(timeOfDayMinutes),
       repeatWeekdays: repeatWeekdays ?? defaultAlarmRepeatWeekdays,
@@ -465,20 +515,6 @@ class AlarmListController {
     );
   }
 
-  Future<AlarmGroupSummary> _activeGroup() async {
-    if (!_ref.read(cloudSyncEnabledProvider)) {
-      return const AlarmGroupSummary(
-        groupId: defaultGroupId,
-        name: 'Demo Group',
-        role: 'member',
-      );
-    }
-    final activeGroup = _ref.read(activeGroupProvider);
-    if (activeGroup == null) {
-      throw StateError('Create or join a group before editing alarms.');
-    }
-    return activeGroup;
-  }
 
   Future<String> _deviceId() {
     if (!_ref.read(cloudSyncEnabledProvider)) {

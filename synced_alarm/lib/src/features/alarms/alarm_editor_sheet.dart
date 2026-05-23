@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/app_providers.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
+import '../../models/account.dart';
 import '../../models/alarm.dart';
 
 Future<void> showAlarmEditor(BuildContext context, {Alarm? alarm}) {
@@ -36,11 +37,13 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
   late int _snoozeMinutes;
   late int _maxSnoozeCount;
   bool _saving = false;
+  String? _selectedGroupId;
 
   @override
   void initState() {
     super.initState();
     final alarm = widget.alarm;
+    _selectedGroupId = alarm?.groupId ?? ref.read(activeGroupProvider)?.groupId ?? defaultGroupId;
     _labelController = TextEditingController(text: alarm?.label ?? '');
     final now = DateTime.now();
     final oneMinuteLater = now.add(const Duration(minutes: 1));
@@ -122,6 +125,78 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
                   ),
                   onSubmitted: (_) => _save(),
                 ),
+                if (ref.watch(cloudSyncEnabledProvider)) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _SectionTitle(l10n.group),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final groups = ref.watch(userGroupsProvider).value ?? const [];
+                      if (groups.isEmpty) {
+                        return Text(
+                          l10n.localDemoGroup,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        );
+                      }
+
+                      final isNewAlarm = widget.alarm == null;
+                      if (isNewAlarm) {
+                        return DropdownButtonFormField<String>(
+                          initialValue: _selectedGroupId,
+                          decoration: InputDecoration(
+                            labelText: l10n.selectGroup,
+                            prefixIcon: const Icon(Icons.group_outlined),
+                          ),
+                          items: [
+                            for (final group in groups)
+                              DropdownMenuItem(
+                                value: group.groupId,
+                                child: Text(group.name),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedGroupId = value);
+                            }
+                          },
+                        );
+                      } else {
+                        final currentGroup = groups.firstWhere(
+                          (g) => g.groupId == widget.alarm!.groupId,
+                          orElse: () => AlarmGroupSummary(
+                            groupId: widget.alarm!.groupId,
+                            name: widget.alarm!.groupId,
+                            role: 'member',
+                          ),
+                        );
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: l10n.group,
+                                prefixIcon: const Icon(Icons.group_outlined),
+                                enabled: false,
+                              ),
+                              child: Text(
+                                currentGroup.name,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              l10n.cannotChangeGroup,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 _SectionTitle(l10n.repeat),
                 _WeekdaySelector(
@@ -267,6 +342,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
         await controller.createAlarm(
           label: label,
           timeOfDayMinutes: minutes,
+          groupId: _selectedGroupId ?? defaultGroupId,
           repeatWeekdays: _safeRepeatWeekdays(),
           ringDurationMinutes: _ringDurationMinutes,
           soundEnabled: _soundEnabled,

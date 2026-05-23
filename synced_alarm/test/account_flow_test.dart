@@ -24,7 +24,7 @@ void main() {
             alarmsProvider.overrideWith(
               (ref) => Stream<List<Alarm>>.value(const []),
             ),
-            deviceRegistrationProvider.overrideWith((ref) async => null),
+            deviceRegistrationProvider.overrideWith((ref) async => const []),
           ],
           child: const MaterialApp(home: AccountGate()),
         ),

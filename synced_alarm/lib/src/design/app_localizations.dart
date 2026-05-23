@@ -180,6 +180,9 @@ class AppLocalizations {
       'reauth_required': 'Please sign in again to complete account deletion.',
       'delete_account_success': 'Account deleted successfully.',
       'error_nickname_empty': 'Please enter a nickname.',
+      'select_group': 'Select Group',
+      'local_demo_group': 'Local Demo',
+      'cannot_change_group': 'Group cannot be changed after creation.',
     },
     'ko': {
       'app_title': '동기화 알람',
@@ -332,6 +335,9 @@ class AppLocalizations {
       'reauth_required': '회원 탈퇴를 완료하려면 다시 로그인해 주세요.',
       'delete_account_success': '회원 탈퇴가 완료되었습니다.',
       'error_nickname_empty': '닉네임을 입력해주세요.',
+      'select_group': '그룹 선택',
+      'local_demo_group': '로컬 데모',
+      'cannot_change_group': '생성 후에는 그룹을 변경할 수 없습니다.',
     },
   };
 
@@ -478,6 +484,9 @@ class AppLocalizations {
   String get reauthRequired => _getValue('reauth_required');
   String get deleteAccountSuccess => _getValue('delete_account_success');
   String get errorNicknameEmpty => _getValue('error_nickname_empty');
+  String get selectGroup => _getValue('select_group');
+  String get localDemoGroup => _getValue('local_demo_group');
+  String get cannotChangeGroup => _getValue('cannot_change_group');
 
   String get mon => _getValue('mon');
   String get tue => _getValue('tue');
