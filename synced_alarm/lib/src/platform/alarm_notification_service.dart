@@ -17,12 +17,13 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../firebase_options.dart';
 import '../models/alarm.dart';
 
-const alarmNotificationChannelId = 'synced_alarm_ringing_v3_sound_vibration';
+const alarmNotificationChannelId =
+    'synced_alarm_ringing_v4_sound_native_vibration';
 const alarmSyncNotificationChannelId = 'synced_alarm_sync_v1';
 const alarmNotificationSoundRepeatFlag = 4;
 const alarmNotificationDismissActionId = 'alarm_action_dismiss';
 const alarmNotificationSnoozeActionId = 'alarm_action_snooze';
-const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v3';
+const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v4';
 const _alarmPayloadPurposeAlarm = 'alarm';
 const _alarmPayloadPurposeSnoozeStatus = 'snoozeStatus';
 const _alarmTriggerChannel = MethodChannel(
@@ -47,24 +48,23 @@ const _ringingChannel = AndroidNotificationChannel(
   description: 'Scheduled alarm notifications with repeated alert sound.',
   importance: Importance.max,
   playSound: true,
-  enableVibration: true,
+  enableVibration: false,
   audioAttributesUsage: AudioAttributesUsage.alarm,
 );
 
 String alarmNotificationChannelIdFor(Alarm alarm) {
   final sound = alarm.soundEnabled ? 'sound' : 'silent';
-  final vibration = alarm.vibrationEnabled ? 'vibration' : 'steady';
-  return '${_alarmNotificationChannelPrefix}_${sound}_$vibration';
+  return '${_alarmNotificationChannelPrefix}_${sound}_native_vibration';
 }
 
 AndroidNotificationChannel alarmNotificationChannelFor(Alarm alarm) {
   return AndroidNotificationChannel(
     alarmNotificationChannelIdFor(alarm),
     'Synced Alarm Ringing',
-    description: 'Scheduled alarm notifications with per-alarm alert settings.',
+    description: 'Scheduled alarm notifications with native vibration control.',
     importance: Importance.max,
     playSound: alarm.soundEnabled,
-    enableVibration: alarm.vibrationEnabled,
+    enableVibration: false,
     audioAttributesUsage: AudioAttributesUsage.alarm,
   );
 }
@@ -845,7 +845,7 @@ class AlarmNotificationService {
         priority: Priority.max,
         category: AndroidNotificationCategory.alarm,
         playSound: alarm.soundEnabled,
-        enableVibration: alarm.vibrationEnabled,
+        enableVibration: false,
         silent: !alarm.soundEnabled && !alarm.vibrationEnabled,
         fullScreenIntent: true,
         additionalFlags: additionalFlags,

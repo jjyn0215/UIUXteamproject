@@ -9,10 +9,35 @@ void main() {
   test('uses a dedicated ringing channel with repeated sound flag', () {
     expect(
       alarmNotificationChannelId,
-      'synced_alarm_ringing_v3_sound_vibration',
+      'synced_alarm_ringing_v4_sound_native_vibration',
     );
     expect(alarmSyncNotificationChannelId, 'synced_alarm_sync_v1');
     expect(alarmNotificationSoundRepeatFlag, 4);
+  });
+
+  test('rings with native vibration only to avoid overlapping motors', () {
+    final source = File(
+      'lib/src/platform/alarm_notification_service.dart',
+    ).readAsStringSync();
+
+    expect(
+      alarmNotificationChannelIdFor(
+        Alarm(
+          id: 'alarm-1',
+          groupId: 'demo',
+          label: 'Morning',
+          timeOfDayMinutes: 8 * 60,
+          enabled: true,
+          vibrationEnabled: true,
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+        ),
+      ),
+      'synced_alarm_ringing_v4_sound_native_vibration',
+    );
+    expect(source, contains('enableVibration: false'));
+    expect(source, isNot(contains('enableVibration: alarm.vibrationEnabled')));
+    expect(source, isNot(contains("final vibration = alarm.vibrationEnabled")));
   });
 
   test('suppresses user-visible notifications for Firebase sync data', () {
