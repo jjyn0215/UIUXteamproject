@@ -142,6 +142,8 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
         if (source?.action != ACTION_ALARM_TRIGGER) return
         val payload = source.getStringExtra(EXTRA_ALARM_PAYLOAD)
         if (payload.isNullOrBlank()) return
+        source.action = null
+        source.removeExtra(EXTRA_ALARM_PAYLOAD)
         pendingAlarmTriggerPayload = payload
         alarmTriggerChannel?.invokeMethod(
             "alarmTriggered",
