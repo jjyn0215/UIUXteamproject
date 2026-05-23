@@ -117,19 +117,25 @@ class AppLocalizations {
       'local_alarms': 'Local alarms',
       'no_account_required': 'No account required',
       'permission_title': 'Permission Guide',
-      'permission_subtitle': 'The following permissions are required to use the app properly.',
+      'permission_subtitle':
+          'The following permissions are required to use the app properly.',
       'permission_notify': 'Show Notifications (Required)',
-      'permission_notify_desc': 'Receive alarm ringing and real-time sync notifications.',
+      'permission_notify_desc':
+          'Receive alarm ringing and real-time sync notifications.',
       'permission_exact': 'Exact Alarms (Required)',
-      'permission_exact_desc': 'Ensures alarms ring precisely at the specified time.',
+      'permission_exact_desc':
+          'Ensures alarms ring precisely at the specified time.',
       'permission_battery': 'Ignore Battery Optimizations (Recommended)',
-      'permission_battery_desc': 'Ensures alarms operate without delay in the background.',
+      'permission_battery_desc':
+          'Ensures alarms operate without delay in the background.',
       'permission_grant': 'Configure',
       'permission_granted': 'Allowed',
       'permission_start': 'Get Started',
       'permission_dialog_title': 'Notification Permission Required',
-      'permission_dialog_msg': 'Notification permission was denied. To ring alarms properly, you must allow notifications in system settings. Would you like to go to settings?',
-      'permission_dialog_permanently_msg': 'Notification permission is permanently denied. To receive alarms on time, please allow notifications in system settings. Would you like to go to settings?',
+      'permission_dialog_msg':
+          'Notification permission was denied. To ring alarms properly, you must allow notifications in system settings. Would you like to go to settings?',
+      'permission_dialog_permanently_msg':
+          'Notification permission is permanently denied. To receive alarms on time, please allow notifications in system settings. Would you like to go to settings?',
       'permission_dialog_settings': 'Go to Settings',
       'theme_setting': 'Theme Mode',
       'theme_system': 'System Default',
@@ -139,6 +145,30 @@ class AppLocalizations {
       'app_version': 'Version',
       'general': 'GENERAL SETTINGS',
       'dismiss_snooze': 'Dismiss Snooze',
+      'language': 'Language',
+      'permission_diagnostic': 'Permission Diagnostics',
+      'permission_all_granted': 'All permissions allowed',
+      'permission_needs_attention': 'Permission configuration required',
+      'synced_devices': 'Synced Devices',
+      'default_snooze': 'Default Snooze Duration',
+      'default_ring': 'Default Ring Duration',
+      'default_sound': 'Default Sound Enabled',
+      'default_vibration': 'Default Vibration Enabled',
+      'devices': 'Devices',
+      'last_synced': 'Last synced',
+      'account_settings': 'Account Settings',
+      'change_nickname': 'Change Nickname',
+      'nickname': 'Nickname',
+      'enter_nickname': 'Enter your nickname',
+      'nickname_updated': 'Nickname updated successfully',
+      'delete_account': 'Delete Account',
+      'delete_account_confirm':
+          'Are you sure you want to delete your account? This action cannot be undone.',
+      'delete_account_warning':
+          'Deleting your account will remove your cloud sync data.',
+      'reauth_required': 'Please sign in again to complete account deletion.',
+      'delete_account_success': 'Account deleted successfully.',
+      'error_nickname_empty': 'Please enter a nickname.',
     },
     'ko': {
       'app_title': '동기화 알람',
@@ -255,8 +285,10 @@ class AppLocalizations {
       'permission_granted': '허용됨',
       'permission_start': '시작하기',
       'permission_dialog_title': '알림 권한 설정 필요',
-      'permission_dialog_msg': '알림 권한이 거부되었습니다. 앱에서 알람을 정상적으로 울리려면 시스템 설정에서 알림을 허용해야 합니다. 알림 설정 화면으로 이동하시겠습니까?',
-      'permission_dialog_permanently_msg': '알림 권한이 영구적으로 거부되었습니다. 정시에 알람을 받으려면 알림 설정 화면에서 알림을 허용해 주세요. 알림 설정 화면으로 이동하시겠습니까?',
+      'permission_dialog_msg':
+          '알림 권한이 거부되었습니다. 앱에서 알람을 정상적으로 울리려면 시스템 설정에서 알림을 허용해야 합니다. 알림 설정 화면으로 이동하시겠습니까?',
+      'permission_dialog_permanently_msg':
+          '알림 권한이 영구적으로 거부되었습니다. 정시에 알람을 받으려면 알림 설정 화면에서 알림을 허용해 주세요. 알림 설정 화면으로 이동하시겠습니까?',
       'permission_dialog_settings': '설정으로 이동',
       'theme_setting': '테마 설정',
       'theme_system': '시스템 기본 설정',
@@ -266,6 +298,28 @@ class AppLocalizations {
       'app_version': '앱 버전',
       'general': '일반 설정',
       'dismiss_snooze': '스누즈 해제',
+      'language': '언어 설정',
+      'permission_diagnostic': '알람 권한 진단',
+      'permission_all_granted': '모든 필수 권한 허용됨',
+      'permission_needs_attention': '일부 권한 설정 필요',
+      'synced_devices': '동기화된 기기 목록',
+      'default_snooze': '기본 다시 알림 간격',
+      'default_ring': '기본 울림 지속 시간',
+      'default_sound': '새 알람 기본 소리 켬',
+      'default_vibration': '새 알람 기본 진동 켬',
+      'devices': '기기',
+      'last_synced': '최근 동기화',
+      'account_settings': '계정 설정',
+      'change_nickname': '닉네임 변경',
+      'nickname': '닉네임',
+      'enter_nickname': '닉네임을 입력하세요',
+      'nickname_updated': '닉네임이 성공적으로 변경되었습니다.',
+      'delete_account': '회원 탈퇴',
+      'delete_account_confirm': '정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+      'delete_account_warning': '회원 탈퇴 시 클라우드 동기화 데이터가 제거됩니다.',
+      'reauth_required': '회원 탈퇴를 완료하려면 다시 로그인해 주세요.',
+      'delete_account_success': '회원 탈퇴가 완료되었습니다.',
+      'error_nickname_empty': '닉네임을 입력해주세요.',
     },
   };
 
@@ -340,9 +394,11 @@ class AppLocalizations {
   String get errorAuthUserDisabled => _getValue('error_auth_user_disabled');
   String get errorAuthUserNotFound => _getValue('error_auth_user_not_found');
   String get errorAuthWrongPassword => _getValue('error_auth_wrong_password');
-  String get errorAuthEmailAlreadyInUse => _getValue('error_auth_email_already_in_use');
+  String get errorAuthEmailAlreadyInUse =>
+      _getValue('error_auth_email_already_in_use');
   String get errorAuthWeakPassword => _getValue('error_auth_weak_password');
-  String get errorAuthInvalidCredential => _getValue('error_auth_invalid_credential');
+  String get errorAuthInvalidCredential =>
+      _getValue('error_auth_invalid_credential');
   String get errorAuthUnknown => _getValue('error_auth_unknown');
   String get alarmGroup => _getValue('alarm_group');
   String get create => _getValue('create');
@@ -375,8 +431,10 @@ class AppLocalizations {
   String get permissionStart => _getValue('permission_start');
   String get permissionDialogTitle => _getValue('permission_dialog_title');
   String get permissionDialogMsg => _getValue('permission_dialog_msg');
-  String get permissionDialogPermanentlyMsg => _getValue('permission_dialog_permanently_msg');
-  String get permissionDialogSettings => _getValue('permission_dialog_settings');
+  String get permissionDialogPermanentlyMsg =>
+      _getValue('permission_dialog_permanently_msg');
+  String get permissionDialogSettings =>
+      _getValue('permission_dialog_settings');
   String get themeSetting => _getValue('theme_setting');
   String get themeSystem => _getValue('theme_system');
   String get themeLight => _getValue('theme_light');
@@ -384,6 +442,29 @@ class AppLocalizations {
   String get appInfo => _getValue('app_info');
   String get appVersion => _getValue('app_version');
   String get general => _getValue('general');
+  String get language => _getValue('language');
+  String get permissionDiagnostic => _getValue('permission_diagnostic');
+  String get permissionAllGranted => _getValue('permission_all_granted');
+  String get permissionNeedsAttention =>
+      _getValue('permission_needs_attention');
+  String get syncedDevices => _getValue('synced_devices');
+  String get defaultSnooze => _getValue('default_snooze');
+  String get defaultRing => _getValue('default_ring');
+  String get defaultSound => _getValue('default_sound');
+  String get defaultVibration => _getValue('default_vibration');
+  String get devices => _getValue('devices');
+  String get lastSynced => _getValue('last_synced');
+  String get accountSettings => _getValue('account_settings');
+  String get changeNickname => _getValue('change_nickname');
+  String get nickname => _getValue('nickname');
+  String get enterNickname => _getValue('enter_nickname');
+  String get nicknameUpdated => _getValue('nickname_updated');
+  String get deleteAccount => _getValue('delete_account');
+  String get deleteAccountConfirm => _getValue('delete_account_confirm');
+  String get deleteAccountWarning => _getValue('delete_account_warning');
+  String get reauthRequired => _getValue('reauth_required');
+  String get deleteAccountSuccess => _getValue('delete_account_success');
+  String get errorNicknameEmpty => _getValue('error_nickname_empty');
 
   String get mon => _getValue('mon');
   String get tue => _getValue('tue');

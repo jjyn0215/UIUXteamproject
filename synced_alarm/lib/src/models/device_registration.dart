@@ -31,4 +31,19 @@ class DeviceRegistration {
       'notificationsEnabled': notificationsEnabled,
     };
   }
+
+  factory DeviceRegistration.fromJson(String id, Map<String, dynamic> json) {
+    return DeviceRegistration(
+      id: id,
+      uid: json['uid'] as String? ?? '',
+      groupId: json['groupId'] as String? ?? '',
+      platform: json['platform'] as String? ?? 'unknown',
+      displayName: json['displayName'] as String? ?? 'Device',
+      lastSeenAt: json['lastSeenAt'] != null
+          ? DateTime.parse(json['lastSeenAt'] as String)
+          : DateTime.now(),
+      fcmToken: json['fcmToken'] as String?,
+      notificationsEnabled: json['notificationsEnabled'] as bool? ?? false,
+    );
+  }
 }

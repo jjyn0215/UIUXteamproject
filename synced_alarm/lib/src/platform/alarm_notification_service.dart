@@ -24,8 +24,6 @@ const alarmNotificationSoundRepeatFlag = 4;
 const alarmNotificationDismissActionId = 'alarm_action_dismiss';
 const alarmNotificationSnoozeActionId = 'alarm_action_snooze';
 const _alarmNotificationChannelPrefix = 'synced_alarm_ringing_v4';
-const _alarmPayloadPurposeAlarm = 'alarm';
-const _alarmPayloadPurposeSnoozeStatus = 'snoozeStatus';
 const _alarmTriggerChannel = MethodChannel(
   'com.teamproject.synced_alarm/alarm_trigger',
 );

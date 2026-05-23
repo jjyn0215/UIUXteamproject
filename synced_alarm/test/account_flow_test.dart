@@ -210,4 +210,12 @@ class _FakeAccountRepository implements AccountRepository {
   Stream<AppUserProfile?> watchUserProfile(String uid) {
     return Stream.value(null);
   }
+
+  @override
+  Future<void> updateDisplayName(String displayName) async {
+    createdDisplayName = displayName;
+  }
+
+  @override
+  Future<void> deleteAccount() async {}
 }

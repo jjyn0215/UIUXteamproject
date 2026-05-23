@@ -27,4 +27,8 @@ abstract interface class AccountRepository {
   Future<void> joinGroup({required String groupId, required String inviteCode});
 
   Future<void> setActiveGroup(String groupId);
+
+  Future<void> updateDisplayName(String displayName);
+
+  Future<void> deleteAccount();
 }

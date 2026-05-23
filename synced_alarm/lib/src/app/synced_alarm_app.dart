@@ -13,12 +13,14 @@ class SyncedAlarmApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final locale = ref.watch(localeProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: buildSereneWakeTheme(brightness: Brightness.light),
       darkTheme: buildSereneWakeTheme(brightness: Brightness.dark),
       themeMode: themeMode,
+      locale: locale,
       localizationsDelegates: const [
         AppLocalizationsDelegate(),
         GlobalMaterialLocalizations.delegate,

@@ -7,13 +7,17 @@ import '../../design/app_localizations.dart';
 import '../../platform/alarm_task_controller.dart';
 
 class PermissionGuideScreen extends ConsumerStatefulWidget {
-  const PermissionGuideScreen({super.key});
+  const PermissionGuideScreen({super.key, this.isModal = false});
+
+  final bool isModal;
 
   @override
-  ConsumerState<PermissionGuideScreen> createState() => _PermissionGuideScreenState();
+  ConsumerState<PermissionGuideScreen> createState() =>
+      _PermissionGuideScreenState();
 }
 
-class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> with WidgetsBindingObserver {
+class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
+    with WidgetsBindingObserver {
   bool _notificationGranted = false;
   bool _exactAlarmGranted = false;
   bool _batteryOptimizationIgnored = false;
@@ -42,7 +46,8 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   Future<void> _checkPermissions() async {
     final notificationStatus = await Permission.notification.status;
     final exactAlarmStatus = await Permission.scheduleExactAlarm.status;
-    final batteryOptimizationStatus = await Permission.ignoreBatteryOptimizations.status;
+    final batteryOptimizationStatus =
+        await Permission.ignoreBatteryOptimizations.status;
 
     if (mounted) {
       setState(() {
@@ -57,14 +62,18 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   Future<void> _showAppSettingsDialog(String message) async {
     final localizations = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark ? SereneWakeColors.primaryDarkBtn : SereneWakeColors.accent;
+    final primaryColor = isDark
+        ? SereneWakeColors.primaryDarkBtn
+        : SereneWakeColors.accent;
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: isDark ? SereneWakeColors.surfaceDark : SereneWakeColors.surface,
+          backgroundColor: isDark
+              ? SereneWakeColors.surfaceDark
+              : SereneWakeColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -78,7 +87,9 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
           content: Text(
             message,
             style: TextStyle(
-              color: isDark ? SereneWakeColors.mutedTextDark : SereneWakeColors.mutedText,
+              color: isDark
+                  ? SereneWakeColors.mutedTextDark
+                  : SereneWakeColors.mutedText,
             ),
           ),
           actions: <Widget>[
@@ -87,17 +98,18 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
               child: Text(
                 localizations.cancel,
                 style: TextStyle(
-                  color: isDark ? SereneWakeColors.mutedTextDark : SereneWakeColors.mutedText,
+                  color: isDark
+                      ? SereneWakeColors.mutedTextDark
+                      : SereneWakeColors.mutedText,
                 ),
               ),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: primaryColor,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: primaryColor),
               onPressed: () async {
                 Navigator.of(context).pop();
-                final opened = await AlarmTaskController.openNotificationSettings();
+                final opened =
+                    await AlarmTaskController.openNotificationSettings();
                 if (!opened) {
                   await openAppSettings();
                 }
@@ -134,10 +146,7 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   }
 
   Future<void> _requestExactAlarm() async {
-    final status = await Permission.scheduleExactAlarm.request();
-    setState(() {
-      _exactAlarmGranted = status.isGranted;
-    });
+    await openAppSettings();
     _checkPermissions();
   }
 
@@ -152,6 +161,11 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   Future<void> _onComplete() async {
     if (_notificationGranted && _exactAlarmGranted) {
       await ref.read(permissionStateProvider.notifier).completeGuide();
+      if (mounted) {
+        if (widget.isModal) {
+          Navigator.of(context).pop();
+        }
+      }
     }
   }
 
@@ -159,16 +173,22 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final primaryColor = isDark ? SereneWakeColors.primaryDarkBtn : SereneWakeColors.accent;
-    final cardColor = isDark ? SereneWakeColors.surfaceDark : SereneWakeColors.surface;
+
+    final primaryColor = isDark
+        ? SereneWakeColors.primaryDarkBtn
+        : SereneWakeColors.accent;
+    final cardColor = isDark
+        ? SereneWakeColors.surfaceDark
+        : SereneWakeColors.surface;
     final textStyle = TextStyle(
       color: isDark ? SereneWakeColors.textDark : SereneWakeColors.text,
       fontWeight: FontWeight.bold,
       fontSize: 16,
     );
     final mutedTextStyle = TextStyle(
-      color: isDark ? SereneWakeColors.mutedTextDark : SereneWakeColors.mutedText,
+      color: isDark
+          ? SereneWakeColors.mutedTextDark
+          : SereneWakeColors.mutedText,
       fontSize: 14,
     );
 
@@ -185,9 +205,28 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
     }
 
     return Scaffold(
+      appBar: widget.isModal
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark
+                      ? SereneWakeColors.textDark
+                      : SereneWakeColors.text,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.margin, vertical: AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.margin,
+            vertical: AppSpacing.lg,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -196,7 +235,9 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
                 localizations.permissionTitle,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: isDark ? SereneWakeColors.textDark : SereneWakeColors.text,
+                  color: isDark
+                      ? SereneWakeColors.textDark
+                      : SereneWakeColors.text,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -207,7 +248,7 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xl),
-              
+
               Expanded(
                 child: ListView(
                   children: [
@@ -270,16 +311,25 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
               FilledButton(
                 onPressed: allRequiredGranted ? _onComplete : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: allRequiredGranted 
-                      ? primaryColor 
-                      : (isDark ? SereneWakeColors.surfaceContainerDark : SereneWakeColors.surfaceContainer),
-                  foregroundColor: allRequiredGranted 
-                      ? (isDark ? SereneWakeColors.backgroundDark : SereneWakeColors.surface)
-                      : (isDark ? SereneWakeColors.mutedTextDark : SereneWakeColors.mutedText),
+                  backgroundColor: allRequiredGranted
+                      ? primaryColor
+                      : (isDark
+                            ? SereneWakeColors.surfaceContainerDark
+                            : SereneWakeColors.surfaceContainer),
+                  foregroundColor: allRequiredGranted
+                      ? (isDark
+                            ? SereneWakeColors.backgroundDark
+                            : SereneWakeColors.surface)
+                      : (isDark
+                            ? SereneWakeColors.mutedTextDark
+                            : SereneWakeColors.mutedText),
                 ),
                 child: Text(
                   localizations.permissionStart,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -306,9 +356,11 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isGranted 
-              ? SereneWakeColors.success.withValues(alpha: 0.3) 
-              : (isDark ? SereneWakeColors.outlineDark : SereneWakeColors.surfaceContainer),
+          color: isGranted
+              ? SereneWakeColors.success.withValues(alpha: 0.3)
+              : (isDark
+                    ? SereneWakeColors.outlineDark
+                    : SereneWakeColors.surfaceContainer),
           width: 1.5,
         ),
       ),
@@ -345,7 +397,10 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
             const SizedBox(width: AppSpacing.sm),
             if (isGranted)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
                 decoration: BoxDecoration(
                   color: SereneWakeColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -353,7 +408,11 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.check, color: SereneWakeColors.success, size: 14),
+                    const Icon(
+                      Icons.check,
+                      color: SereneWakeColors.success,
+                      size: 14,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       AppLocalizations.of(context).permissionGranted,
@@ -371,7 +430,10 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
                 onPressed: onTap,
                 style: TextButton.styleFrom(
                   backgroundColor: primaryColor.withValues(alpha: 0.1),
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
