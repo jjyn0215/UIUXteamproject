@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:synced_alarm/src/data/account_repository.dart';
 import 'package:synced_alarm/src/data/app_providers.dart';
+import 'package:synced_alarm/src/design/app_localizations.dart';
 import 'package:synced_alarm/src/features/account/account_gate.dart';
 import 'package:synced_alarm/src/features/account/auth_screen.dart';
 import 'package:synced_alarm/src/features/account/group_setup_screen.dart';

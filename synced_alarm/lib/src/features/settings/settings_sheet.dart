@@ -81,7 +81,7 @@ class SettingsPanel extends ConsumerWidget {
             ],
             _ProfileHeader(
               profile: profile,
-              activeGroup: activeGroup,
+              activeGroup: signedIn ? activeGroup : null,
               onTap: () {
                 if (!useFirebase) return;
                 if (!signedIn) {
@@ -240,10 +240,7 @@ class _SettingsSectionLabel extends StatelessWidget {
 }
 
 class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
-    required this.title,
-    required this.value,
-  });
+  const _SettingsRow({required this.title, required this.value});
 
   final String title;
   final String value;
