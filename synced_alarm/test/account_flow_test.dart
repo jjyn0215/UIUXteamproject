@@ -47,7 +47,11 @@ void main() {
           userProfileProvider.overrideWith((ref) => Stream.value(null)),
           userGroupsProvider.overrideWith((ref) => Stream.value(const [])),
         ],
-        child: const MaterialApp(home: Scaffold(body: SettingsPanel())),
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: SettingsPanel()),
+        ),
       ),
     );
 
