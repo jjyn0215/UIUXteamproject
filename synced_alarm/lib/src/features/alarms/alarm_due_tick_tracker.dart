@@ -32,6 +32,14 @@ class AlarmDueTickTracker {
     await _markKeyHandled(key, now);
   }
 
+  Future<bool> isHandled(Alarm alarm, DateTime now) async {
+    await _refreshSharedTicks(now);
+    final dueAt = alarmDueTimeFor(alarm, now);
+    if (dueAt == null) return false;
+    final key = alarmDueTickKey(alarm, dueAt);
+    return _handledTicks.containsKey(key);
+  }
+
   Future<void> _refreshSharedTicks(DateTime now) async {
     try {
       final prefs = await SharedPreferences.getInstance();

@@ -306,11 +306,15 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     final now = DateTime.now();
     final shouldValidateDueTick =
         launch.source != AlarmNotificationLaunchSource.notification;
-    if (shouldValidateDueTick &&
-        !(await _dueTickTracker.shouldRing(alarm, now))) {
-      return false;
-    }
-    if (!shouldValidateDueTick) {
+    if (shouldValidateDueTick) {
+      if (!(await _dueTickTracker.shouldRing(alarm, now))) {
+        return false;
+      }
+    } else {
+      if (await _dueTickTracker.isHandled(alarm, now)) {
+        _pendingAlarmLaunch = null;
+        return false;
+      }
       await _dueTickTracker.markHandled(alarm, now);
     }
     _pendingAlarmLaunch = null;
