@@ -13,6 +13,7 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
+const functions = require("firebase-functions");
 
 initializeApp();
 
@@ -410,3 +411,44 @@ function writeMembership(transaction, params) {
     {merge: true},
   );
 }
+
+exports.onUserDelete = functions.auth.user().onDelete(async (user) => {
+  const uid = user.uid;
+  const db = getFirestore();
+  logger.info("onUserDelete triggered", { uid });
+
+  const userRef = db.collection("users").doc(uid);
+  const userGroupsSnapshot = await userRef.collection("groups").get();
+
+  const batch = db.batch();
+
+  for (const groupDoc of userGroupsSnapshot.docs) {
+    const groupId = groupDoc.id;
+
+    // groups/{groupId}/members/{uid} 삭제
+    const memberRef = db.collection("groups").doc(groupId).collection("members").doc(uid);
+    batch.delete(memberRef);
+
+    // groups/{groupId}/devices/ 에서 해당 uid를 가진 디바이스 삭제
+    const devicesSnapshot = await db
+      .collection("groups")
+      .doc(groupId)
+      .collection("devices")
+      .where("uid", "==", uid)
+      .get();
+
+    devicesSnapshot.forEach((deviceDoc) => {
+      batch.delete(deviceDoc.ref);
+    });
+
+    // users/{uid}/groups/{groupId} 삭제
+    batch.delete(groupDoc.ref);
+  }
+
+  // users/{uid} 프로필 삭제
+  batch.delete(userRef);
+
+  await batch.commit();
+  logger.info("onUserDelete completed", { uid });
+});
+

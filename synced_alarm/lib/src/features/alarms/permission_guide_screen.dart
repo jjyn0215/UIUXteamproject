@@ -7,7 +7,9 @@ import '../../design/app_localizations.dart';
 import '../../platform/alarm_task_controller.dart';
 
 class PermissionGuideScreen extends ConsumerStatefulWidget {
-  const PermissionGuideScreen({super.key});
+  const PermissionGuideScreen({super.key, this.isModal = false});
+
+  final bool isModal;
 
   @override
   ConsumerState<PermissionGuideScreen> createState() => _PermissionGuideScreenState();
@@ -134,10 +136,7 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   }
 
   Future<void> _requestExactAlarm() async {
-    final status = await Permission.scheduleExactAlarm.request();
-    setState(() {
-      _exactAlarmGranted = status.isGranted;
-    });
+    await openAppSettings();
     _checkPermissions();
   }
 
@@ -152,6 +151,11 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
   Future<void> _onComplete() async {
     if (_notificationGranted && _exactAlarmGranted) {
       await ref.read(permissionStateProvider.notifier).completeGuide();
+      if (mounted) {
+        if (widget.isModal) {
+          Navigator.of(context).pop();
+        }
+      }
     }
   }
 
@@ -185,6 +189,20 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen> w
     }
 
     return Scaffold(
+      appBar: widget.isModal
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? SereneWakeColors.textDark : SereneWakeColors.text,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.margin, vertical: AppSpacing.lg),

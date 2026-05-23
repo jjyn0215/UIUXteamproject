@@ -144,6 +144,29 @@ class FirebaseAccountRepository implements AccountRepository {
     );
   }
 
+  @override
+  Future<void> updateDisplayName(String displayName) async {
+    final user = _requireUser();
+    if (displayName.trim().isEmpty) {
+      throw ArgumentError('Display name cannot be empty.');
+    }
+    await withFirebaseOperationTimeout(
+      user.updateDisplayName(displayName.trim()),
+      operationName: 'update display name',
+    );
+    await user.reload();
+    await _upsertCurrentUserProfile(displayName: displayName);
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final user = _requireUser();
+    await withFirebaseOperationTimeout(
+      user.delete(),
+      operationName: 'delete account',
+    );
+  }
+
   Future<void> _upsertCurrentUserProfile({
     String? uid,
     String? displayName,

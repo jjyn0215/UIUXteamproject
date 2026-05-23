@@ -25,6 +25,7 @@ import 'local_demo_alarm_repository.dart';
 
 const useFirebase = bool.fromEnvironment('USE_FIREBASE');
 const useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
+final isFlutterTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 const firebaseEmulatorHost = String.fromEnvironment(
   'FIREBASE_EMULATOR_HOST',
   defaultValue: 'localhost',
@@ -559,7 +560,7 @@ final permissionStateProvider = NotifierProvider<PermissionStateNotifier, AsyncV
 class PermissionStateNotifier extends Notifier<AsyncValue<bool>> {
   @override
   AsyncValue<bool> build() {
-    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (isFlutterTest) {
       return const AsyncValue.data(true);
     }
     _checkPermissionsInitially();
@@ -572,7 +573,7 @@ class PermissionStateNotifier extends Notifier<AsyncValue<bool>> {
 
   Future<void> checkPermissions() async {
     try {
-      if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+      if (isFlutterTest) {
         state = const AsyncValue.data(true);
         return;
       }
@@ -609,7 +610,7 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
   @override
   ThemeMode build() {
-    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (isFlutterTest) {
       return ThemeMode.system;
     }
     _loadThemeMode();
@@ -657,3 +658,157 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
     }
   }
 }
+
+class DefaultAlarmSettings {
+  const DefaultAlarmSettings({
+    required this.snoozeMinutes,
+    required this.ringDurationMinutes,
+    required this.soundEnabled,
+    required this.vibrationEnabled,
+  });
+
+  final int snoozeMinutes;
+  final int ringDurationMinutes;
+  final bool soundEnabled;
+  final bool vibrationEnabled;
+
+  DefaultAlarmSettings copyWith({
+    int? snoozeMinutes,
+    int? ringDurationMinutes,
+    bool? soundEnabled,
+    bool? vibrationEnabled,
+  }) {
+    return DefaultAlarmSettings(
+      snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
+      ringDurationMinutes: ringDurationMinutes ?? this.ringDurationMinutes,
+      soundEnabled: soundEnabled ?? this.soundEnabled,
+      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+    );
+  }
+}
+
+class DefaultAlarmSettingsNotifier extends Notifier<DefaultAlarmSettings> {
+  static const _snoozeKey = 'default_alarm_snooze_minutes';
+  static const _ringKey = 'default_alarm_ring_duration_minutes';
+  static const _soundKey = 'default_alarm_sound_enabled';
+  static const _vibrateKey = 'default_alarm_vibration_enabled';
+
+  @override
+  DefaultAlarmSettings build() {
+    if (isFlutterTest) {
+      return const DefaultAlarmSettings(
+        snoozeMinutes: 5,
+        ringDurationMinutes: 5,
+        soundEnabled: true,
+        vibrationEnabled: true,
+      );
+    }
+    _loadSettings();
+    return const DefaultAlarmSettings(
+      snoozeMinutes: 5,
+      ringDurationMinutes: 5,
+      soundEnabled: true,
+      vibrationEnabled: true,
+    );
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = DefaultAlarmSettings(
+        snoozeMinutes: prefs.getInt(_snoozeKey) ?? 5,
+        ringDurationMinutes: prefs.getInt(_ringKey) ?? 5,
+        soundEnabled: prefs.getBool(_soundKey) ?? true,
+        vibrationEnabled: prefs.getBool(_vibrateKey) ?? true,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> setSnoozeMinutes(int minutes) async {
+    state = state.copyWith(snoozeMinutes: minutes);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_snoozeKey, minutes);
+  }
+
+  Future<void> setRingDurationMinutes(int minutes) async {
+    state = state.copyWith(ringDurationMinutes: minutes);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_ringKey, minutes);
+  }
+
+  Future<void> setSoundEnabled(bool enabled) async {
+    state = state.copyWith(soundEnabled: enabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_soundKey, enabled);
+  }
+
+  Future<void> setVibrationEnabled(bool enabled) async {
+    state = state.copyWith(vibrationEnabled: enabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_vibrateKey, enabled);
+  }
+}
+
+final defaultAlarmSettingsProvider = NotifierProvider<DefaultAlarmSettingsNotifier, DefaultAlarmSettings>(
+  DefaultAlarmSettingsNotifier.new,
+);
+
+class LocaleNotifier extends Notifier<Locale?> {
+  static const _localePrefsKey = 'synced_alarm_locale';
+
+  @override
+  Locale? build() {
+    if (isFlutterTest) {
+      return const Locale('en');
+    }
+    _loadLocale();
+    return null;
+  }
+
+  Future<void> _loadLocale() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final languageCode = prefs.getString(_localePrefsKey);
+      if (languageCode != null) {
+        state = Locale(languageCode);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setLocale(Locale? locale) async {
+    state = locale;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (locale != null) {
+        await prefs.setString(_localePrefsKey, locale.languageCode);
+      } else {
+        await prefs.remove(_localePrefsKey);
+      }
+    } catch (_) {}
+  }
+}
+
+final localeProvider = NotifierProvider<LocaleNotifier, Locale?>(
+  LocaleNotifier.new,
+);
+
+final groupDevicesProvider = StreamProvider<List<DeviceRegistration>>((ref) {
+  final activeGroup = ref.watch(activeGroupProvider);
+  if (activeGroup == null || !useFirebase) {
+    return Stream.value(const []);
+  }
+
+  return FirebaseFirestore.instance
+      .collection('groups')
+      .doc(activeGroup.groupId)
+      .collection('devices')
+      .snapshots()
+      .map((snapshot) {
+        return snapshot.docs.map((doc) {
+          return DeviceRegistration.fromJson(
+            doc.id,
+            doc.data(),
+          );
+        }).toList();
+      });
+});

@@ -36,13 +36,28 @@ class LaunchRouterActivity : Activity() {
     }
 
     private fun Intent?.isAlarmNotificationLaunch(): Boolean {
-        val payload = this?.getStringExtra("payload") ?: return false
-        return try {
-            val json = JSONObject(payload)
-            json.optString("type") == "alarm" &&
-                json.optString("purpose", "alarm") == "alarm"
-        } catch (_: Exception) {
-            payload.startsWith("alarm:")
+        val payload = this?.getStringExtra("payload")
+        if (!payload.isNullOrBlank()) {
+            try {
+                val json = JSONObject(payload)
+                if (json.optString("type") == "alarm" &&
+                    json.optString("purpose", "alarm") == "alarm") {
+                    return true
+                }
+            } catch (_: Exception) {
+                if (payload.startsWith("alarm:")) return true
+            }
         }
+
+        val notificationPayload = this?.getStringExtra("notificationPayload")
+        if (!notificationPayload.isNullOrBlank() && notificationPayload.contains("alarm")) {
+            return true
+        }
+
+        if (this?.hasExtra("notificationId") == true) {
+            return true
+        }
+
+        return false
     }
 }

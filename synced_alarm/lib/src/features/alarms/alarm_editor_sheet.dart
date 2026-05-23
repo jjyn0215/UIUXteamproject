@@ -47,11 +47,12 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
     _repeatWeekdays = {
       ...(alarm?.repeatWeekdays ?? defaultAlarmRepeatWeekdays),
     };
+    final defaultSettings = ref.read(defaultAlarmSettingsProvider);
     _ringDurationMinutes =
-        alarm?.ringDurationMinutes ?? defaultAlarmRingDurationMinutes;
-    _soundEnabled = alarm?.soundEnabled ?? true;
-    _vibrationEnabled = alarm?.vibrationEnabled ?? true;
-    _snoozeMinutes = alarm?.snoozeMinutes ?? defaultAlarmSnoozeMinutes;
+        alarm?.ringDurationMinutes ?? defaultSettings.ringDurationMinutes;
+    _soundEnabled = alarm?.soundEnabled ?? defaultSettings.soundEnabled;
+    _vibrationEnabled = alarm?.vibrationEnabled ?? defaultSettings.vibrationEnabled;
+    _snoozeMinutes = alarm?.snoozeMinutes ?? defaultSettings.snoozeMinutes;
     _maxSnoozeCount = alarm?.maxSnoozeCount ?? defaultAlarmMaxSnoozeCount;
   }
 

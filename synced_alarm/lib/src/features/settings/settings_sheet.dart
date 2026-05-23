@@ -5,8 +5,9 @@ import '../../data/app_providers.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/account.dart';
+import '../account/account_settings_screen.dart';
 import '../account/auth_screen.dart';
-import '../account/group_setup_screen.dart';
+import '../alarms/permission_guide_screen.dart';
 
 Future<void> showSettingsSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -108,46 +109,32 @@ class SettingsPanel extends ConsumerWidget {
                 else
                   _SettingsRow(
                     title: l10n.account,
-                    value: profile?.email ?? l10n.active,
-                    trailing: TextButton(
-                      onPressed: () {
-                        ref.read(accountRepositoryProvider).signOut();
-                      },
-                      child: Text(l10n.signOut),
-                    ),
-                  ),
-                if (useFirebase && signedIn) ...[
-                  const Divider(height: 1),
-                  _SettingsRow(
-                    title: l10n.sharedGroup,
-                    value: activeGroup?.name ?? l10n.noGroup,
-                    detail: activeGroup == null
-                        ? l10n.needGroupToSync
-                        : '${l10n.groupId}: ${activeGroup.groupId}',
-                  ),
-                  const Divider(height: 1),
-                  _SettingsRow(
-                    title: l10n.groupMgmt,
-                    value: l10n.createJoinSwitch,
+                    value: profile?.displayName ?? profile?.email ?? l10n.active,
                     trailing: TextButton(
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => const GroupSetupScreen(),
+                            builder: (_) => const AccountSettingsScreen(),
                           ),
                         );
                       },
                       child: Text(l10n.open),
                     ),
                   ),
-                ],
               ],
             ),
+            const SizedBox(height: AppSpacing.lg),
+            _SettingsSectionLabel(l10n.alarmDefaults),
+            const _DefaultAlarmSettingsGroup(),
             const SizedBox(height: AppSpacing.lg),
             _SettingsSectionLabel(l10n.general),
             const _SettingsGroup(
               children: [
                 _ThemeSettingsRow(),
+                Divider(height: 1),
+                _LanguageSettingsRow(),
+                Divider(height: 1),
+                _PermissionDiagnosticRow(),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -420,3 +407,267 @@ class _ThemeSettingsRow extends ConsumerWidget {
     }
   }
 }
+
+class _PermissionDiagnosticRow extends ConsumerWidget {
+  const _PermissionDiagnosticRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissionState = ref.watch(permissionStateProvider);
+    final l10n = AppLocalizations.of(context);
+
+    return permissionState.when(
+      data: (allGranted) {
+        final color = allGranted
+            ? SereneWakeColors.primary
+            : Theme.of(context).colorScheme.error;
+        final text = allGranted
+            ? l10n.permissionAllGranted
+            : l10n.permissionNeedsAttention;
+
+        return InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PermissionGuideScreen(isModal: true),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.permissionDiagnostic,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        text,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, st) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _DefaultAlarmSettingsGroup extends ConsumerWidget {
+  const _DefaultAlarmSettingsGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(defaultAlarmSettingsProvider);
+    final notifier = ref.read(defaultAlarmSettingsProvider.notifier);
+    final l10n = AppLocalizations.of(context);
+
+    return _SettingsGroup(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.defaultSnooze,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: settings.snoozeMinutes,
+                  borderRadius: BorderRadius.circular(12),
+                  onChanged: (val) {
+                    if (val != null) notifier.setSnoozeMinutes(val);
+                  },
+                  items: [5, 10, 15, 20].map((m) {
+                    return DropdownMenuItem(
+                      value: m,
+                      child: Text('$m${l10n.min}'),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.defaultRing,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: settings.ringDurationMinutes,
+                  borderRadius: BorderRadius.circular(12),
+                  onChanged: (val) {
+                    if (val != null) notifier.setRingDurationMinutes(val);
+                  },
+                  items: [1, 3, 5, 10].map((m) {
+                    return DropdownMenuItem(
+                      value: m,
+                      child: Text('$m${l10n.min}'),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          title: Text(
+            l10n.defaultSound,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          value: settings.soundEnabled,
+          activeThumbColor: Theme.of(context).colorScheme.primary,
+          activeTrackColor: Theme.of(context).colorScheme.primaryContainer,
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          onChanged: notifier.setSoundEnabled,
+        ),
+        const Divider(height: 1),
+        SwitchListTile(
+          title: Text(
+            l10n.defaultVibration,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          value: settings.vibrationEnabled,
+          activeThumbColor: Theme.of(context).colorScheme.primary,
+          activeTrackColor: Theme.of(context).colorScheme.primaryContainer,
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          onChanged: notifier.setVibrationEnabled,
+        ),
+      ],
+    );
+  }
+}
+
+class _LanguageSettingsRow extends ConsumerWidget {
+  const _LanguageSettingsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLocale = ref.watch(localeProvider);
+    final l10n = AppLocalizations.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.language,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  currentLocale == null
+                      ? l10n.themeSystem
+                      : (currentLocale.languageCode == 'ko' ? '한국어' : 'English'),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: currentLocale?.languageCode ?? 'system',
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              onChanged: (String? val) {
+                if (val == 'system') {
+                  ref.read(localeProvider.notifier).setLocale(null);
+                } else if (val != null) {
+                  ref.read(localeProvider.notifier).setLocale(Locale(val));
+                }
+              },
+              items: [
+                DropdownMenuItem(
+                  value: 'system',
+                  child: Text(l10n.themeSystem),
+                ),
+                const DropdownMenuItem(
+                  value: 'ko',
+                  child: Text('한국어'),
+                ),
+                const DropdownMenuItem(
+                  value: 'en',
+                  child: Text('English'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
