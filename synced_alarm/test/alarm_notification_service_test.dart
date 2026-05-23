@@ -375,6 +375,20 @@ void main() {
     },
   );
 
+  test('AlarmActivity hides app task when the lock-screen alarm is dismissed', () {
+    final source = File(
+      'android/app/src/main/kotlin/com/teamproject/synced_alarm/'
+      'AlarmActivity.kt',
+    ).readAsStringSync();
+
+    expect(source, contains('setShowWhenLocked(false)'));
+    expect(source, contains('setTurnScreenOn(false)'));
+    expect(source, contains('window.clearFlags'));
+    expect(source, contains('Intent.ACTION_MAIN'));
+    expect(source, contains('Intent.CATEGORY_HOME'));
+    expect(source, contains('overridePendingTransition(0, 0)'));
+  });
+
   test('alarm ringing screen starts and stops native vibration', () {
     final source = File(
       'lib/src/features/alarms/alarm_ring_screen.dart',
