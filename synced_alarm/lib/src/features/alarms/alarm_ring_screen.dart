@@ -26,6 +26,11 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
   bool _busy = false;
   Timer? _autoSnoozeTimer;
 
+  bool get _canSnooze {
+    return widget.alarm.maxSnoozeCount > 0 &&
+        widget.alarm.snoozeCount < widget.alarm.maxSnoozeCount;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +65,7 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
     final duration = Duration(minutes: widget.alarm.ringDurationMinutes);
     _autoSnoozeTimer = Timer(duration, () {
       if (mounted && !_busy) {
-        _run(widget.onSnooze);
+        _run(_canSnooze ? widget.onSnooze : widget.onDismiss);
       }
     });
   }
@@ -123,20 +128,22 @@ class _AlarmRingScreenState extends State<AlarmRingScreen> {
               const Spacer(),
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _run(widget.onSnooze),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withAlpha(170)),
-                        minimumSize: const Size.fromHeight(58),
-                        shape: const StadiumBorder(),
+                  if (_canSnooze) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _run(widget.onSnooze),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.white.withAlpha(170)),
+                          minimumSize: const Size.fromHeight(58),
+                          shape: const StadiumBorder(),
+                        ),
+                        icon: const Icon(Icons.snooze_rounded),
+                        label: Text(l10n.snooze),
                       ),
-                      icon: const Icon(Icons.snooze_rounded),
-                      label: Text(l10n.snooze),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
+                    const SizedBox(width: AppSpacing.md),
+                  ],
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: _busy ? null : () => _run(widget.onDismiss),

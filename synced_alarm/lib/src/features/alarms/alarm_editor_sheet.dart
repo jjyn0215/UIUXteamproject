@@ -32,6 +32,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
   late int _ringDurationMinutes;
   late bool _soundEnabled;
   late bool _vibrationEnabled;
+  late bool _snoozeEnabled;
   late int _snoozeMinutes;
   late int _maxSnoozeCount;
   bool _saving = false;
@@ -55,6 +56,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
         alarm?.vibrationEnabled ?? defaultSettings.vibrationEnabled;
     _snoozeMinutes = alarm?.snoozeMinutes ?? defaultSettings.snoozeMinutes;
     _maxSnoozeCount = alarm?.maxSnoozeCount ?? defaultAlarmMaxSnoozeCount;
+    _snoozeEnabled = _maxSnoozeCount > 0;
   }
 
   @override
@@ -160,27 +162,43 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 _SectionTitle(l10n.snooze),
-                _OptionDropdown(
-                  label: l10n.snoozeAfter,
+                _SwitchSetting(
                   icon: Icons.snooze_rounded,
-                  value: _snoozeMinutes,
-                  options: const [5, 10, 15, 30],
-                  suffix: l10n.min,
+                  title: l10n.enableSnooze,
+                  value: _snoozeEnabled,
                   onChanged: (value) {
-                    setState(() => _snoozeMinutes = value);
+                    setState(() {
+                      _snoozeEnabled = value;
+                      if (value && _maxSnoozeCount <= 0) {
+                        _maxSnoozeCount = defaultAlarmMaxSnoozeCount;
+                      }
+                    });
                   },
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                _OptionDropdown(
-                  label: l10n.maxSnoozes,
-                  icon: Icons.repeat_rounded,
-                  value: _maxSnoozeCount,
-                  options: const [0, 1, 2, 3, 5],
-                  suffix: l10n.times,
-                  onChanged: (value) {
-                    setState(() => _maxSnoozeCount = value);
-                  },
-                ),
+                if (_snoozeEnabled) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _OptionDropdown(
+                    label: l10n.snoozeAfter,
+                    icon: Icons.snooze_rounded,
+                    value: _snoozeMinutes,
+                    options: const [5, 10, 15, 30],
+                    suffix: l10n.min,
+                    onChanged: (value) {
+                      setState(() => _snoozeMinutes = value);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _OptionDropdown(
+                    label: l10n.maxSnoozes,
+                    icon: Icons.repeat_rounded,
+                    value: _maxSnoozeCount,
+                    options: const [1, 2, 3, 5],
+                    suffix: l10n.times,
+                    onChanged: (value) {
+                      setState(() => _maxSnoozeCount = value);
+                    },
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xl),
                 SizedBox(
                   width: double.infinity,
@@ -241,6 +259,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
     final minutes = _time.hour * 60 + _time.minute;
     final trimmedLabel = _labelController.text.trim();
     final label = trimmedLabel.isEmpty ? l10n.alarm : trimmedLabel;
+    final maxSnoozeCount = _snoozeEnabled ? _maxSnoozeCount : 0;
 
     try {
       final alarm = widget.alarm;
@@ -253,7 +272,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
           soundEnabled: _soundEnabled,
           vibrationEnabled: _vibrationEnabled,
           snoozeMinutes: _snoozeMinutes,
-          maxSnoozeCount: _maxSnoozeCount,
+          maxSnoozeCount: maxSnoozeCount,
         );
       } else {
         await controller.updateAlarm(
@@ -267,7 +286,7 @@ class _AlarmEditorSheetState extends ConsumerState<AlarmEditorSheet> {
             soundEnabled: _soundEnabled,
             vibrationEnabled: _vibrationEnabled,
             snoozeMinutes: _snoozeMinutes,
-            maxSnoozeCount: _maxSnoozeCount,
+            maxSnoozeCount: maxSnoozeCount,
             updatedBy: defaultDeviceId,
           ),
         );

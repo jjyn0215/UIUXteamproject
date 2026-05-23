@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 class AppLocalizations {
   AppLocalizations(this.locale);
 
   final Locale locale;
+
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = [
+    AppLocalizationsDelegate(),
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
+
+  static const supportedLocales = [Locale('en', ''), Locale('ko', '')];
 
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations) ??
@@ -68,6 +78,7 @@ class AppLocalizations {
       'wake_up': 'Wake up',
       'set_alarm': 'Set alarm',
       'save_alarm': 'Save alarm',
+      'enable_snooze': 'Use snooze',
       'snooze_after': 'Snooze after',
       'max_snoozes': 'Max snoozes',
       'times': 'times',
@@ -227,6 +238,7 @@ class AppLocalizations {
       'wake_up': '기상',
       'set_alarm': '알람 설정',
       'save_alarm': '알람 저장',
+      'enable_snooze': '다시 알림 사용',
       'snooze_after': '다시 알림 간격',
       'max_snoozes': '최대 다시 알림 횟수',
       'times': '회',
@@ -377,6 +389,7 @@ class AppLocalizations {
   String get wakeUp => _getValue('wake_up');
   String get setAlarm => _getValue('set_alarm');
   String get saveAlarm => _getValue('save_alarm');
+  String get enableSnooze => _getValue('enable_snooze');
   String get snoozeAfter => _getValue('snooze_after');
   String get maxSnoozes => _getValue('max_snoozes');
   String get times => _getValue('times');

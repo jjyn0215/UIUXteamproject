@@ -50,6 +50,34 @@ void main() {
     expect(find.text('Label'), findsOneWidget);
   });
 
+  testWidgets('toggles snooze details in the alarm editor', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value(const <Alarm>[])),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('New alarm'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Use snooze'), findsOneWidget);
+    expect(find.text('Snooze after'), findsOneWidget);
+    expect(find.text('Max snoozes'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Use snooze'));
+    await tester.tap(find.text('Use snooze'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Snooze after'), findsNothing);
+    expect(find.text('Max snoozes'), findsNothing);
+  });
+
   testWidgets('shows a dedicated alarm screen while an alarm is ringing', (
     WidgetTester tester,
   ) async {
@@ -82,6 +110,37 @@ void main() {
     expect(find.text('Snooze'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.byTooltip('New alarm'), findsNothing);
+  });
+
+  testWidgets('hides the snooze action when snooze is disabled', (
+    WidgetTester tester,
+  ) async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      maxSnoozeCount: 0,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+          ringingAlarmProvider.overrideWith(
+            () => _FixedRingingAlarmNotifier(alarm),
+          ),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Snooze'), findsNothing);
+    expect(find.text('Dismiss'), findsOneWidget);
   });
 
   testWidgets('dismiss on ringing screen finishes alarm presentation', (
