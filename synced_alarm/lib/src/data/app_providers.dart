@@ -836,19 +836,60 @@ final localeProvider = NotifierProvider<LocaleNotifier, Locale?>(
 );
 
 final groupDevicesProvider = StreamProvider<List<DeviceRegistration>>((ref) {
-  final activeGroup = ref.watch(activeGroupProvider);
-  if (activeGroup == null || !useFirebase) {
+  if (!useFirebase) {
     return Stream.value(const []);
   }
 
-  return FirebaseFirestore.instance
-      .collection('groups')
-      .doc(activeGroup.groupId)
-      .collection('devices')
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          return DeviceRegistration.fromJson(doc.id, doc.data());
-        }).toList();
-      });
+  final groups = ref.watch(userGroupsProvider).value ?? const [];
+  if (groups.isEmpty) {
+    return Stream.value(const <DeviceRegistration>[]);
+  }
+
+  final controller = StreamController<List<DeviceRegistration>>();
+  final subscriptions = <String, StreamSubscription>{};
+  final latestDevices = <String, List<DeviceRegistration>>{};
+
+  void emitMerged() {
+    if (controller.isClosed) return;
+
+    final uniqueDevices = <String, DeviceRegistration>{};
+    for (final deviceList in latestDevices.values) {
+      for (final device in deviceList) {
+        uniqueDevices[device.id] = device;
+      }
+    }
+
+    final merged = uniqueDevices.values.toList();
+    merged.sort((a, b) => b.lastSeenAt.compareTo(a.lastSeenAt));
+    controller.add(merged);
+  }
+
+  for (final group in groups) {
+    final stream = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(group.groupId)
+        .collection('devices')
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            return DeviceRegistration.fromJson(doc.id, doc.data());
+          }).toList();
+        });
+
+    subscriptions[group.groupId] = stream.listen((devices) {
+      latestDevices[group.groupId] = devices;
+      emitMerged();
+    }, onError: (err) {
+      debugPrint('Error watching devices for group ${group.groupId}: $err');
+    });
+  }
+
+  ref.onDispose(() {
+    for (final sub in subscriptions.values) {
+      sub.cancel();
+    }
+    controller.close();
+  });
+
+  return controller.stream;
 });
