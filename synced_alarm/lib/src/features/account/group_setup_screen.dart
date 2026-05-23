@@ -307,12 +307,35 @@ class _ExistingGroupsCard extends ConsumerWidget {
                       visualDensity: VisualDensity.compact,
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: group.groupId));
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              '${group.name}의 그룹 ID가 클립보드에 복사되었습니다.',
+                            content: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFFB9EFC5), // Stitch Primary Container 그린 컬러
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    '${group.name}의 그룹 ID가 복사되었습니다.',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            duration: const Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: const Color(0xEE2C342E), // Stitch 메인 텍스트 다크 컬러(#2c342e) 기반 투명 배경
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            duration: const Duration(seconds: 2),
                           ),
                         );
                       },
@@ -325,19 +348,6 @@ class _ExistingGroupsCard extends ConsumerWidget {
                         ref
                             .read(accountRepositoryProvider)
                             .setActiveGroup(group.groupId);
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${group.name}이(가) 기본 생성 그룹으로 지정되었습니다.',
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        }
                       },
               ),
           ],
