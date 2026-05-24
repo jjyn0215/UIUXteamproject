@@ -124,10 +124,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
       _ => l10n.settings,
     };
 
-    final screenWidth = MediaQuery.of(context).size.width;
     final paddingBottom = MediaQuery.of(context).padding.bottom;
-    const double barWidth = 200.0;
-    final double barLeft = (screenWidth - barWidth) / 2;
 
     return Scaffold(
       extendBody: true,
@@ -174,28 +171,12 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
               _ => const SettingsPanel(),
             },
             Positioned(
-              left: barLeft,
-              width: barWidth,
               bottom: paddingBottom + 16,
-              child: Container(
-                height: 62,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withAlpha(235),
-                  borderRadius: BorderRadius.circular(31),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
-                    width: 1,
-                  ),
-                ),
+              left: 0,
+              right: 0,
+              child: Center(
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildTabItem(
                       context: context,
@@ -204,6 +185,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
                       selectedIcon: Icons.alarm_rounded,
                       label: l10n.alarms,
                     ),
+                    const SizedBox(width: 12),
                     _buildTabItem(
                       context: context,
                       index: 1,
@@ -248,9 +230,14 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     final activeColor = theme.colorScheme.primary;
     final inactiveColor = theme.colorScheme.outline;
 
-    return Expanded(
+    return SizedBox(
+      width: 86,
+      height: 62,
       child: Material(
-        color: Colors.transparent,
+        color: theme.colorScheme.surface.withAlpha(235),
+        elevation: 3,
+        shadowColor: Colors.black.withAlpha(24),
+        borderRadius: BorderRadius.circular(31),
         child: InkWell(
           onTap: () => setState(() => _selectedTab = index),
           borderRadius: BorderRadius.circular(32),
