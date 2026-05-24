@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:synced_alarm/src/app/synced_alarm_app.dart';
 import 'package:synced_alarm/src/data/app_providers.dart';
+import 'package:synced_alarm/src/features/alarms/alarm_due_tick_tracker.dart';
 import 'package:synced_alarm/src/models/alarm.dart';
+import 'package:synced_alarm/src/platform/alarm_notification_service.dart';
 import 'package:synced_alarm/src/platform/alarm_task_controller.dart';
 
 void main() {
@@ -162,6 +164,7 @@ void main() {
       call,
     ) async {
       calls.add(call);
+      if (call.method == 'finishAlarmPresentation') return true;
       return null;
     });
     FlutterLocalNotificationsPlatform.instance =
@@ -209,7 +212,131 @@ void main() {
         calls.map((call) => call.method),
         contains('finishAlarmPresentation'),
       );
+      expect(find.widgetWithText(FilledButton, 'Dismiss'), findsNothing);
+      expect(find.byIcon(Icons.alarm_rounded), findsOneWidget);
+      expect(find.byTooltip('New alarm'), findsOneWidget);
     } finally {
+      debugDefaultTargetPlatformOverride = null;
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    }
+  });
+
+  testWidgets(
+    'clears a resolved ringing alarm when returning to the main task',
+    (WidgetTester tester) async {
+      final now = DateTime.now();
+      final alarm = Alarm(
+        id: 'alarm-1',
+        groupId: 'demo',
+        label: 'Morning standup',
+        timeOfDayMinutes: now.hour * 60 + now.minute,
+        enabled: true,
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+      await AlarmDueTickTracker().markResolved(alarm, now);
+
+      final calls = <MethodCall>[];
+      const channel = MethodChannel('com.teamproject.synced_alarm/alarm_task');
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call);
+        return null;
+      });
+      FlutterLocalNotificationsPlatform.instance =
+          _FakeAndroidLocalNotificationsPlugin();
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+              ringingAlarmProvider.overrideWith(
+                () => _FixedRingingAlarmNotifier(alarm),
+              ),
+            ],
+            child: const SyncedAlarmApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.widgetWithText(FilledButton, 'Dismiss'), findsNothing);
+        expect(find.byIcon(Icons.alarm_rounded), findsOneWidget);
+        expect(
+          calls.map((call) => call.method),
+          contains('stopAlarmVibration'),
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+        binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+      }
+    },
+  );
+
+  testWidgets('remote dismiss command closes a visible ringing alarm screen', (
+    WidgetTester tester,
+  ) async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    final command = AlarmCommandEvent(
+      alarmId: 'alarm-1',
+      groupId: 'demo',
+      commandType: AlarmCommandType.dismiss,
+      sourceDeviceId: 'device-2',
+    );
+    SharedPreferences.setMockInitialValues({
+      alarmCommandEventQueuePrefsKey: [command.encode()],
+    });
+
+    final calls = <MethodCall>[];
+    const channel = MethodChannel('com.teamproject.synced_alarm/alarm_task');
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call);
+      return true;
+    });
+    FlutterLocalNotificationsPlatform.instance =
+        _FakeAndroidLocalNotificationsPlugin();
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            alarmsProvider.overrideWith((ref) => Stream.value([alarm])),
+            ringingAlarmProvider.overrideWith(
+              () => _FixedRingingAlarmNotifier(alarm),
+            ),
+          ],
+          child: const SyncedAlarmApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Morning standup'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Dismiss'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+
+      expect(find.widgetWithText(FilledButton, 'Dismiss'), findsNothing);
+      expect(find.byIcon(Icons.alarm_rounded), findsOneWidget);
+      expect(
+        calls.map((call) => call.method),
+        containsAll(['stopAlarmVibration', 'finishAlarmPresentation']),
+      );
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
       debugDefaultTargetPlatformOverride = null;
       binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
     }

@@ -82,6 +82,40 @@ void main() {
     );
   });
 
+  test('parses alarm command data for active ring screens', () {
+    final event = AlarmCommandEvent.fromRemoteData({
+      'type': 'alarm.command',
+      'groupId': 'group-1',
+      'alarmId': 'alarm-1',
+      'commandId': 'command-1',
+      'commandType': 'dismiss',
+      'sourceDeviceId': 'device-2',
+    });
+
+    expect(event, isNotNull);
+    expect(event?.alarmId, 'alarm-1');
+    expect(event?.groupId, 'group-1');
+    expect(event?.commandId, 'command-1');
+    expect(event?.commandType, AlarmCommandType.dismiss);
+    expect(event?.sourceDeviceId, 'device-2');
+    expect(
+      AlarmCommandEvent.fromRemoteData({
+        'type': 'alarm.updated',
+        'alarmId': 'alarm-1',
+        'commandType': 'dismiss',
+      }),
+      isNull,
+    );
+    expect(
+      AlarmCommandEvent.fromRemoteData({
+        'type': 'alarm.command',
+        'alarmId': 'alarm-1',
+        'commandType': 'unknown',
+      }),
+      isNull,
+    );
+  });
+
   test('builds notification payload from alarm data', () {
     final alarm = Alarm(
       id: 'alarm-1',

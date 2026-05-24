@@ -23,24 +23,31 @@ class AlarmHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<AlarmHomeScreen> createState() => _AlarmHomeScreenState();
 }
 
-class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
+class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
+    with WidgetsBindingObserver {
   Timer? _timer;
   ProviderSubscription<AsyncValue<List<Alarm>>>? _alarmScheduleSubscription;
   StreamSubscription<AlarmNotificationLaunch>? _alarmLaunchSubscription;
   StreamSubscription<AlarmNotificationActionRequest>? _alarmActionSubscription;
+  StreamSubscription<AlarmCommandEvent>? _alarmCommandSubscription;
+  Timer? _commandPoller;
   final AlarmDueTickTracker _dueTickTracker = AlarmDueTickTracker();
   String? _pendingAlarmLaunchId;
   AlarmNotificationActionRequest? _pendingAlarmAction;
+  AlarmCommandEvent? _pendingAlarmCommand;
   int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _alarmScheduleSubscription = ref.listenManual<AsyncValue<List<Alarm>>>(
       alarmsProvider,
       (_, next) {
         final alarms = next.value;
         if (alarms != null) {
+          unawaited(_clearResolvedRingingAlarm());
+          unawaited(_handlePendingAlarmCommand(alarms));
           unawaited(_handlePendingAlarmAction(alarms));
           _handlePendingAlarmLaunch(alarms);
           if (ref.read(ringingAlarmProvider) == null) {
@@ -58,6 +65,10 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
         .listen((action) {
           unawaited(_handleAlarmAction(action));
         });
+    _alarmCommandSubscription = AlarmNotificationService.instance.alarmCommands
+        .listen((command) {
+          unawaited(_handleAlarmCommand(command));
+        });
     _timer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (mounted) {
         if (_selectedTab == 0) {
@@ -65,8 +76,15 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
         }
       }
     });
+    _commandPoller = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (mounted && ref.read(ringingAlarmProvider) != null) {
+        unawaited(_handlePendingAlarmCommand());
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_clearResolvedRingingAlarm());
+      unawaited(_handlePendingAlarmCommand());
       unawaited(_handlePendingAlarmAction());
       _handlePendingAlarmLaunch();
     });
@@ -74,11 +92,21 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _alarmScheduleSubscription?.close();
     unawaited(_alarmLaunchSubscription?.cancel());
     unawaited(_alarmActionSubscription?.cancel());
+    unawaited(_alarmCommandSubscription?.cancel());
     _timer?.cancel();
+    _commandPoller?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_clearResolvedRingingAlarm());
+    }
   }
 
   @override
@@ -124,40 +152,34 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            switch (_selectedTab) {
-              0 => alarms.when(
-                data: (items) => _AlarmListView(
-                  alarms: items,
-                  now: DateTime.now(),
-                  onCreate: () => showAlarmEditor(context),
-                  onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
-                  onToggle: (alarm, enabled) {
-                    return ref
-                        .read(alarmListControllerProvider)
-                        .toggleAlarm(alarm, enabled);
-                  },
-                  onDelete: (alarm) {
-                    return ref
-                        .read(alarmListControllerProvider)
-                        .deleteAlarm(alarm);
-                  },
-                  onTestRing: (alarm) {
-                    return ref.read(alarmListControllerProvider).ring(alarm);
-                  },
-                ),
-                error: (error, _) => _ErrorPanel(
-                  error: error,
-                  onRetry: () => ref.invalidate(alarmsProvider),
-                ),
-                loading: () => const _LoadingPanel(),
-              ),
-              1 => const _HistoryPanel(),
-              _ => const SettingsPanel(),
-            },
-          ],
-        ),
+        child: switch (_selectedTab) {
+          0 => alarms.when(
+            data: (items) => _AlarmListView(
+              alarms: items,
+              now: DateTime.now(),
+              onCreate: () => showAlarmEditor(context),
+              onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
+              onToggle: (alarm, enabled) {
+                return ref
+                    .read(alarmListControllerProvider)
+                    .toggleAlarm(alarm, enabled);
+              },
+              onDelete: (alarm) {
+                return ref.read(alarmListControllerProvider).deleteAlarm(alarm);
+              },
+              onTestRing: (alarm) {
+                return ref.read(alarmListControllerProvider).ring(alarm);
+              },
+            ),
+            error: (error, _) => _ErrorPanel(
+              error: error,
+              onRetry: () => ref.invalidate(alarmsProvider),
+            ),
+            loading: () => const _LoadingPanel(),
+          ),
+          1 => const _HistoryPanel(),
+          _ => const SettingsPanel(),
+        },
       ),
       floatingActionButton: _selectedTab == 0
           ? FloatingActionButton(
@@ -217,6 +239,13 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     }
   }
 
+  Future<void> _handleAlarmCommand(AlarmCommandEvent command) async {
+    final alarms = ref.read(alarmsProvider).value;
+    if (!(await _applyAlarmCommand(command, alarms))) {
+      _pendingAlarmCommand = command;
+    }
+  }
+
   void _handlePendingAlarmLaunch([List<Alarm>? alarms]) {
     final initialLaunch = AlarmNotificationService.instance
         .consumePendingAlarmLaunch();
@@ -245,6 +274,54 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     await _runAlarmNotificationAction(pendingAction, availableAlarms);
   }
 
+  Future<void> _handlePendingAlarmCommand([List<Alarm>? alarms]) async {
+    final initialCommand = AlarmNotificationService.instance
+        .consumePendingAlarmCommand();
+    if (initialCommand != null) {
+      _pendingAlarmCommand = initialCommand;
+    }
+
+    final persistedCommands = await AlarmNotificationService.instance
+        .consumePersistedAlarmCommands();
+    for (final command in persistedCommands) {
+      await _applyOrQueueAlarmCommand(command, alarms);
+    }
+
+    final pendingCommand = _pendingAlarmCommand;
+    if (pendingCommand == null) return;
+    await _applyOrQueueAlarmCommand(pendingCommand, alarms);
+  }
+
+  Future<void> _applyOrQueueAlarmCommand(
+    AlarmCommandEvent command,
+    List<Alarm>? alarms,
+  ) async {
+    final availableAlarms = alarms ?? ref.read(alarmsProvider).value;
+    if (!(await _applyAlarmCommand(command, availableAlarms))) {
+      _pendingAlarmCommand = command;
+    }
+  }
+
+  Future<bool> _applyAlarmCommand(
+    AlarmCommandEvent command,
+    List<Alarm>? alarms,
+  ) async {
+    if (command.commandType != AlarmCommandType.dismiss &&
+        command.commandType != AlarmCommandType.snooze) {
+      return true;
+    }
+
+    final ringingAlarm = ref.read(ringingAlarmProvider);
+    if (ringingAlarm == null || ringingAlarm.id != command.alarmId) {
+      if (alarms == null) return false;
+      return _findAlarmById(alarms, command.alarmId) != null;
+    }
+
+    _pendingAlarmCommand = null;
+    await _clearVisibleRingingAlarm(ringingAlarm);
+    return true;
+  }
+
   Future<bool> _runAlarmNotificationAction(
     AlarmNotificationActionRequest action,
     List<Alarm> alarms,
@@ -253,8 +330,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     if (alarm == null) return false;
 
     _pendingAlarmAction = null;
-    await AlarmTaskController.stopAlarmVibration();
-    await _dueTickTracker.markHandled(alarm, DateTime.now());
+    await _clearVisibleRingingAlarm(alarm);
     final controller = ref.read(alarmListControllerProvider);
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
@@ -295,13 +371,33 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   ) async {
     try {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
+      await _dueTickTracker.markResolved(alarm, DateTime.now());
       await action();
     } finally {
-      final finished = await AlarmTaskController.finishAlarmPresentation();
-      if (!finished) {
-        ref.read(ringingAlarmProvider.notifier).clear();
-      }
+      await _clearVisibleRingingAlarm(alarm);
     }
+  }
+
+  Future<void> _clearVisibleRingingAlarm(Alarm alarm) async {
+    final now = DateTime.now();
+    await AlarmTaskController.stopAlarmVibration();
+    await _dueTickTracker.markHandled(alarm, now);
+    await _dueTickTracker.markResolved(alarm, now);
+    if (mounted && ref.read(ringingAlarmProvider)?.id == alarm.id) {
+      ref.read(ringingAlarmProvider.notifier).clear();
+    }
+    await AlarmTaskController.finishAlarmPresentation();
+  }
+
+  Future<void> _clearResolvedRingingAlarm() async {
+    final ringingAlarm = ref.read(ringingAlarmProvider);
+    if (ringingAlarm == null) return;
+    final resolved = await _dueTickTracker.isResolved(
+      ringingAlarm,
+      DateTime.now(),
+    );
+    if (!mounted || !resolved) return;
+    await _clearVisibleRingingAlarm(ringingAlarm);
   }
 }
 

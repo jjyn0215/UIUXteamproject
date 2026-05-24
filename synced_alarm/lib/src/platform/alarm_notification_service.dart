@@ -30,6 +30,7 @@ const _alarmTriggerChannel = MethodChannel(
 const _alarmSchedulerChannel = MethodChannel(
   'com.teamproject.synced_alarm/alarm_scheduler',
 );
+const alarmCommandEventQueuePrefsKey = 'alarm_command_events_v1';
 
 const alarmNotificationActions = <AndroidNotificationAction>[
   AndroidNotificationAction(alarmNotificationSnoozeActionId, 'Snooze'),
@@ -114,10 +115,13 @@ class AlarmNotificationService {
   final StreamController<AlarmNotificationActionRequest>
   _alarmActionController =
       StreamController<AlarmNotificationActionRequest>.broadcast();
+  final StreamController<AlarmCommandEvent> _alarmCommandController =
+      StreamController<AlarmCommandEvent>.broadcast();
 
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   AlarmNotificationLaunch? _pendingAlarmLaunch;
   AlarmNotificationActionRequest? _pendingAlarmAction;
+  AlarmCommandEvent? _pendingAlarmCommand;
   bool _localInitialized = false;
   bool _messagingInitialized = false;
   bool _nativeAlarmTriggerInitialized = false;
@@ -130,6 +134,8 @@ class AlarmNotificationService {
   Stream<AlarmNotificationActionRequest> get alarmActions =>
       _alarmActionController.stream;
 
+  Stream<AlarmCommandEvent> get alarmCommands => _alarmCommandController.stream;
+
   AlarmNotificationLaunch? consumePendingAlarmLaunch() {
     final launch = _pendingAlarmLaunch;
     _pendingAlarmLaunch = null;
@@ -140,6 +146,33 @@ class AlarmNotificationService {
     final action = _pendingAlarmAction;
     _pendingAlarmAction = null;
     return action;
+  }
+
+  AlarmCommandEvent? consumePendingAlarmCommand() {
+    final command = _pendingAlarmCommand;
+    _pendingAlarmCommand = null;
+    return command;
+  }
+
+  Future<List<AlarmCommandEvent>> consumePersistedAlarmCommands() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final rawEvents =
+          prefs.getStringList(alarmCommandEventQueuePrefsKey) ?? const [];
+      if (rawEvents.isEmpty) return const [];
+      await prefs.remove(alarmCommandEventQueuePrefsKey);
+      final events = <AlarmCommandEvent>[];
+      for (final rawEvent in rawEvents) {
+        final event = AlarmCommandEvent.decode(rawEvent);
+        if (event != null) {
+          events.add(event);
+        }
+      }
+      return events;
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<void> initialize({required bool firebaseEnabled}) async {
@@ -170,10 +203,8 @@ class AlarmNotificationService {
     if (kIsWeb || _localInitialized) return;
 
     const initializationSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      linux: LinuxInitializationSettings(
-        defaultActionName: "Open Let's alarm",
-      ),
+      android: AndroidInitializationSettings('ic_notification'),
+      linux: LinuxInitializationSettings(defaultActionName: "Open Let's alarm"),
       windows: WindowsInitializationSettings(
         appName: "Let's alarm",
         appUserModelId: 'com.teamproject.synced_alarm',
@@ -419,6 +450,14 @@ class AlarmNotificationService {
       deviceId = prefs.getString('synced_alarm_device_id') ?? 'unknown_device';
     } catch (_) {}
 
+    await _publishAlarmCommand(
+      AlarmCommandEvent.fromNotificationAction(
+        action,
+        sourceDeviceId: deviceId,
+      ),
+      persist: true,
+    );
+
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
         await cancelAlarmById(action.alarmId, background: true);
@@ -658,13 +697,40 @@ class AlarmNotificationService {
       } else if (shouldCancelLocalScheduleForSilentSync(data)) {
         await cancelAlarmById(alarmId, background: true);
       } else if (type == 'alarm.command') {
-        debugPrint(
-          'Silent sync: command ${data['commandType']} received for $alarmId; '
-          'local schedule is driven by alarm update/delete payloads.',
-        );
+        final command = AlarmCommandEvent.fromRemoteData(data);
+        if (command != null) {
+          await _publishAlarmCommand(command, persist: true);
+        }
       }
     } catch (e, stackTrace) {
       debugPrint('Error during background silent sync: $e\n$stackTrace');
+    }
+  }
+
+  Future<void> _publishAlarmCommand(
+    AlarmCommandEvent command, {
+    required bool persist,
+  }) async {
+    _pendingAlarmCommand = command;
+    _alarmCommandController.add(command);
+    if (persist) {
+      await _persistAlarmCommand(command);
+    }
+  }
+
+  Future<void> _persistAlarmCommand(AlarmCommandEvent command) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final rawEvents =
+          prefs.getStringList(alarmCommandEventQueuePrefsKey) ?? const [];
+      final nextEvents = [...rawEvents, command.encode()];
+      final cappedEvents = nextEvents.length > 20
+          ? nextEvents.sublist(nextEvents.length - 20)
+          : nextEvents;
+      await prefs.setStringList(alarmCommandEventQueuePrefsKey, cappedEvents);
+    } catch (_) {
+      // Command stream delivery still covers the active Flutter isolate.
     }
   }
 
@@ -913,6 +979,96 @@ class AlarmNotificationLaunch {
 }
 
 enum AlarmNotificationActionType { dismiss, snooze }
+
+class AlarmCommandEvent {
+  const AlarmCommandEvent({
+    required this.alarmId,
+    required this.commandType,
+    this.groupId,
+    this.commandId,
+    this.sourceDeviceId,
+  });
+
+  factory AlarmCommandEvent.fromNotificationAction(
+    AlarmNotificationActionRequest action, {
+    required String sourceDeviceId,
+  }) {
+    return AlarmCommandEvent(
+      alarmId: action.alarmId,
+      groupId: action.payloadData.groupId,
+      commandType: switch (action.type) {
+        AlarmNotificationActionType.dismiss => AlarmCommandType.dismiss,
+        AlarmNotificationActionType.snooze => AlarmCommandType.snooze,
+      },
+      sourceDeviceId: sourceDeviceId,
+    );
+  }
+
+  static AlarmCommandEvent? fromRemoteData(Map<String, String> data) {
+    if (data['type'] != 'alarm.command') return null;
+    final alarmId = data['alarmId'];
+    if (alarmId == null || alarmId.trim().isEmpty) return null;
+    final commandType = _commandTypeFromName(data['commandType']);
+    if (commandType == null) return null;
+    return AlarmCommandEvent(
+      alarmId: alarmId,
+      groupId: _nonEmpty(data['groupId']),
+      commandId: _nonEmpty(data['commandId']),
+      commandType: commandType,
+      sourceDeviceId: _nonEmpty(data['sourceDeviceId']),
+    );
+  }
+
+  static AlarmCommandEvent? decode(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      final alarmId = decoded['alarmId'] as String?;
+      if (alarmId == null || alarmId.trim().isEmpty) return null;
+      final commandType = _commandTypeFromName(decoded['commandType']);
+      if (commandType == null) return null;
+      return AlarmCommandEvent(
+        alarmId: alarmId,
+        groupId: decoded['groupId'] as String?,
+        commandId: decoded['commandId'] as String?,
+        commandType: commandType,
+        sourceDeviceId: decoded['sourceDeviceId'] as String?,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final String alarmId;
+  final AlarmCommandType commandType;
+  final String? groupId;
+  final String? commandId;
+  final String? sourceDeviceId;
+
+  String encode() {
+    return jsonEncode({
+      'alarmId': alarmId,
+      'commandType': commandType.name,
+      if (groupId != null) 'groupId': groupId,
+      if (commandId != null) 'commandId': commandId,
+      if (sourceDeviceId != null) 'sourceDeviceId': sourceDeviceId,
+    });
+  }
+}
+
+AlarmCommandType? _commandTypeFromName(Object? value) {
+  final name = value?.toString();
+  if (name == null || name.isEmpty) return null;
+  for (final type in AlarmCommandType.values) {
+    if (type.name == name) return type;
+  }
+  return null;
+}
+
+String? _nonEmpty(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+  return value;
+}
 
 class AlarmNotificationActionRequest {
   const AlarmNotificationActionRequest({
