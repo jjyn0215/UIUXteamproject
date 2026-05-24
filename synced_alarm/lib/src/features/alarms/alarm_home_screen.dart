@@ -136,108 +136,104 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: Stack(
           children: [
-            switch (_selectedTab) {
-              0 => alarms.when(
-                data: (items) => _AlarmListView(
-                  alarms: items,
-                  now: DateTime.now(),
-                  onCreate: () => showAlarmEditor(context),
-                  onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
-                  onToggle: (alarm, enabled) {
-                    return ref
-                        .read(alarmListControllerProvider)
-                        .toggleAlarm(alarm, enabled);
-                  },
-                  onDelete: (alarm) {
-                    return ref
-                        .read(alarmListControllerProvider)
-                        .deleteAlarm(alarm);
-                  },
-                  onTestRing: (alarm) {
-                    return ref.read(alarmListControllerProvider).ring(alarm);
-                  },
+            Padding(
+              padding: const EdgeInsets.only(bottom: 92),
+              child: switch (_selectedTab) {
+                0 => alarms.when(
+                  data: (items) => _AlarmListView(
+                    alarms: items,
+                    now: DateTime.now(),
+                    onCreate: () => showAlarmEditor(context),
+                    onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
+                    onToggle: (alarm, enabled) {
+                      return ref
+                          .read(alarmListControllerProvider)
+                          .toggleAlarm(alarm, enabled);
+                    },
+                    onDelete: (alarm) {
+                      return ref
+                          .read(alarmListControllerProvider)
+                          .deleteAlarm(alarm);
+                    },
+                    onTestRing: (alarm) {
+                      return ref.read(alarmListControllerProvider).ring(alarm);
+                    },
+                  ),
+                  error: (error, _) => _ErrorPanel(
+                    error: error,
+                    onRetry: () => ref.invalidate(alarmsProvider),
+                  ),
+                  loading: () => const _LoadingPanel(),
                 ),
-                error: (error, _) => _ErrorPanel(
-                  error: error,
-                  onRetry: () => ref.invalidate(alarmsProvider),
+                _ => const SettingsPanel(),
+              },
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+              child: Center(
+                child: Container(
+                  width: 220,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withAlpha(235),
+                    borderRadius: BorderRadius.circular(31),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(15),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildTabItem(
+                        context: context,
+                        index: 0,
+                        icon: Icons.alarm_outlined,
+                        selectedIcon: Icons.alarm_rounded,
+                        label: l10n.alarms,
+                      ),
+                      _buildTabItem(
+                        context: context,
+                        index: 1,
+                        icon: Icons.settings_outlined,
+                        selectedIcon: Icons.settings_rounded,
+                        label: l10n.settings,
+                      ),
+                    ],
+                  ),
                 ),
-                loading: () => const _LoadingPanel(),
               ),
-              _ => const SettingsPanel(),
-            },
+            ),
           ],
         ),
       ),
       floatingActionButton: _selectedTab == 0
-          ? FloatingActionButton(
-              tooltip: l10n.newAlarm,
-              onPressed: () => showAlarmEditor(context),
-              backgroundColor: SereneWakeColors.primary,
-              foregroundColor: SereneWakeColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80),
+              child: FloatingActionButton(
+                tooltip: l10n.newAlarm,
+                onPressed: () => showAlarmEditor(context),
+                backgroundColor: SereneWakeColors.primary,
+                foregroundColor: SereneWakeColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add_rounded),
               ),
-              child: const Icon(Icons.add_rounded),
             )
           : null,
-      bottomNavigationBar: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const targetWidth = 220.0;
-            final horizontalPadding = math.max(
-              16.0,
-              (constraints.maxWidth - targetWidth) / 2,
-            );
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                0,
-                horizontalPadding,
-                16,
-              ),
-              child: Container(
-                height: 62,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withAlpha(235),
-                  borderRadius: BorderRadius.circular(31),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildTabItem(
-                      context: context,
-                      index: 0,
-                      icon: Icons.alarm_outlined,
-                      selectedIcon: Icons.alarm_rounded,
-                      label: l10n.alarms,
-                    ),
-                    _buildTabItem(
-                      context: context,
-                      index: 1,
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings_rounded,
-                      label: l10n.settings,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
     );
   }
 
