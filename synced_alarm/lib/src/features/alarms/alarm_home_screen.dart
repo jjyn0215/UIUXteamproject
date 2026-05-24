@@ -125,6 +125,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     };
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
         title: Text(title),
         actions: [
@@ -182,45 +183,59 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
             )
           : null,
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withAlpha(235),
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(15),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
-                width: 1,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const targetWidth = 220.0;
+            final horizontalPadding = math.max(
+              16.0,
+              (constraints.maxWidth - targetWidth) / 2,
+            );
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                0,
+                horizontalPadding,
+                16,
               ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildTabItem(
-                  context: context,
-                  index: 0,
-                  icon: Icons.alarm_outlined,
-                  selectedIcon: Icons.alarm_rounded,
-                  label: l10n.alarms,
+              child: Container(
+                height: 62,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withAlpha(235),
+                  borderRadius: BorderRadius.circular(31),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
+                    width: 1,
+                  ),
                 ),
-                _buildTabItem(
-                  context: context,
-                  index: 1,
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: l10n.settings,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildTabItem(
+                      context: context,
+                      index: 0,
+                      icon: Icons.alarm_outlined,
+                      selectedIcon: Icons.alarm_rounded,
+                      label: l10n.alarms,
+                    ),
+                    _buildTabItem(
+                      context: context,
+                      index: 1,
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings_rounded,
+                      label: l10n.settings,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
