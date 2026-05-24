@@ -96,7 +96,7 @@ void main() {
     final payload = AlarmNotificationPayload.fromAlarm(alarm);
 
     expect(payload.id, alarmNotificationId(alarm.id));
-    expect(payload.title, 'Synced Alarm');
+    expect(payload.title, "Let's alarm");
     expect(payload.body, '8:30 AM · Morning standup');
     final payloadData = AlarmNotificationPayloadData.fromPayload(
       payload.payload,
@@ -323,7 +323,7 @@ void main() {
     );
 
     expect(request.id, alarmNotificationId(alarm.id));
-    expect(request.title, 'Synced Alarm');
+    expect(request.title, "Let's alarm");
     expect(request.body, '8:30 AM · Morning standup');
     expect(
       AlarmNotificationPayloadData.fromPayload(request.payload)?.alarmId,

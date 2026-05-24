@@ -42,7 +42,7 @@ const alarmNotificationActions = <AndroidNotificationAction>[
 
 const _ringingChannel = AndroidNotificationChannel(
   alarmNotificationChannelId,
-  'Synced Alarm Ringing',
+  "Let's alarm Ringing",
   description: 'Scheduled alarm notifications with repeated alert sound.',
   importance: Importance.max,
   playSound: true,
@@ -58,7 +58,7 @@ String alarmNotificationChannelIdFor(Alarm alarm) {
 AndroidNotificationChannel alarmNotificationChannelFor(Alarm alarm) {
   return AndroidNotificationChannel(
     alarmNotificationChannelIdFor(alarm),
-    'Synced Alarm Ringing',
+    "Let's alarm Ringing",
     description: 'Scheduled alarm notifications with native vibration control.',
     importance: Importance.max,
     playSound: alarm.soundEnabled,
@@ -69,7 +69,7 @@ AndroidNotificationChannel alarmNotificationChannelFor(Alarm alarm) {
 
 const _syncChannel = AndroidNotificationChannel(
   alarmSyncNotificationChannelId,
-  'Synced Alarm Sync',
+  "Let's alarm Sync",
   description: 'Silent synchronization status notifications.',
   importance: Importance.low,
   playSound: false,
@@ -172,10 +172,10 @@ class AlarmNotificationService {
     const initializationSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       linux: LinuxInitializationSettings(
-        defaultActionName: 'Open Synced Alarm',
+        defaultActionName: "Open Let's alarm",
       ),
       windows: WindowsInitializationSettings(
-        appName: 'Synced Alarm',
+        appName: "Let's alarm",
         appUserModelId: 'com.teamproject.synced_alarm',
         guid: '7f87f1fc-7820-4c11-93c4-b6d1f9f0b2b5',
       ),
@@ -256,7 +256,7 @@ class AlarmNotificationService {
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         alarmSyncNotificationChannelId,
-        'Synced Alarm Sync',
+        "Let's alarm Sync",
         channelDescription: 'Alarm sync and status notifications.',
         importance: Importance.low,
         priority: Priority.low,
@@ -275,7 +275,7 @@ class AlarmNotificationService {
       ),
       linux: LinuxNotificationDetails(
         urgency: LinuxNotificationUrgency.low,
-        defaultActionName: 'Open Synced Alarm',
+        defaultActionName: "Open Let's alarm",
       ),
       windows: WindowsNotificationDetails(
         scenario: WindowsNotificationScenario.reminder,
@@ -836,7 +836,7 @@ class AlarmNotificationService {
       ),
       linux: LinuxNotificationDetails(
         urgency: LinuxNotificationUrgency.critical,
-        defaultActionName: 'Open Synced Alarm',
+        defaultActionName: "Open Let's alarm",
       ),
       windows: WindowsNotificationDetails(
         scenario: WindowsNotificationScenario.alarm,
@@ -859,7 +859,7 @@ class AlarmNotificationService {
       ),
       linux: LinuxNotificationDetails(
         urgency: LinuxNotificationUrgency.low,
-        defaultActionName: 'Open Synced Alarm',
+        defaultActionName: "Open Let's alarm",
       ),
       windows: WindowsNotificationDetails(
         scenario: WindowsNotificationScenario.reminder,
@@ -1091,7 +1091,7 @@ class AlarmNotificationPayload {
     final data = AlarmNotificationPayloadData.fromAlarm(alarm);
     return AlarmNotificationPayload(
       id: alarmNotificationId(alarm.id),
-      title: 'Synced Alarm',
+      title: "Let's alarm",
       body: '${alarm.timeLabel} · ${alarm.label}',
       payload: data.encode(),
     );
@@ -1106,7 +1106,7 @@ class AlarmNotificationPayload {
       'alarm.created' => 'Alarm created',
       'alarm.updated' => 'Alarm updated',
       'alarm.deleted' => 'Alarm deleted',
-      _ => 'Synced Alarm',
+      _ => "Let's alarm",
     };
     final body = commandType.isNotEmpty
         ? 'Command: $commandType'
@@ -1127,7 +1127,7 @@ class AlarmNotificationPayload {
     if (notification != null) {
       return AlarmNotificationPayload(
         id: (message.messageId ?? notification.hashCode.toString()).hashCode,
-        title: notification.title ?? 'Synced Alarm',
+        title: notification.title ?? "Let's alarm",
         body: notification.body ?? 'Alarm sync update received',
         payload: message.messageId,
       );

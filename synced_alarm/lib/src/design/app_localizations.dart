@@ -22,7 +22,7 @@ class AppLocalizations {
 
   static const _localizedValues = <String, Map<String, String>>{
     'en': {
-      'app_title': 'Synced Alarm',
+      'app_title': 'Let\'s alarm',
       'alarms': 'Alarms',
       'history': 'History',
       'settings': 'Settings',
@@ -195,7 +195,7 @@ class AppLocalizations {
       'registered_devices': 'Registered Devices',
     },
     'ko': {
-      'app_title': '동기화 알람',
+      'app_title': '렛츠알람',
       'alarms': '알람',
       'history': '기록',
       'settings': '설정',
