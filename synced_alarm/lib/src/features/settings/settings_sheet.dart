@@ -5,7 +5,7 @@ import '../../data/app_providers.dart';
 import '../../design/app_localizations.dart';
 import '../../design/app_theme.dart';
 import '../../models/account.dart';
-import '../../platform/alarm_task_controller.dart';
+// import '../../platform/alarm_task_controller.dart';
 import '../account/account_settings_screen.dart';
 import '../account/auth_screen.dart';
 import '../alarms/permission_guide_screen.dart';
@@ -110,8 +110,8 @@ class SettingsPanel extends ConsumerWidget {
                 _LanguageSettingsRow(),
                 Divider(height: 1),
                 _PermissionDiagnosticRow(),
-                Divider(height: 1),
-                _FullScreenAlarmPermissionRow(),
+                // Divider(height: 1),
+                // _FullScreenAlarmPermissionRow(),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -433,118 +433,118 @@ class _PermissionDiagnosticRow extends ConsumerWidget {
   }
 }
 
-class _FullScreenAlarmPermissionRow extends StatefulWidget {
-  const _FullScreenAlarmPermissionRow();
+// class _FullScreenAlarmPermissionRow extends StatefulWidget {
+//   const _FullScreenAlarmPermissionRow();
 
-  @override
-  State<_FullScreenAlarmPermissionRow> createState() =>
-      _FullScreenAlarmPermissionRowState();
-}
+//   @override
+//   State<_FullScreenAlarmPermissionRow> createState() =>
+//       _FullScreenAlarmPermissionRowState();
+// }
 
-class _FullScreenAlarmPermissionRowState
-    extends State<_FullScreenAlarmPermissionRow>
-    with WidgetsBindingObserver {
-  bool? _allowed;
+// class _FullScreenAlarmPermissionRowState
+//     extends State<_FullScreenAlarmPermissionRow>
+//     with WidgetsBindingObserver {
+//   bool? _allowed;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _refresh();
-  }
+//   @override
+//   void initState() {
+//     super.initState();
+//     WidgetsBinding.instance.addObserver(this);
+//     _refresh();
+//   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
+//   @override
+//   void dispose() {
+//     WidgetsBinding.instance.removeObserver(this);
+//     super.dispose();
+//   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _refresh();
-    }
-  }
+//   @override
+//   void didChangeAppLifecycleState(AppLifecycleState state) {
+//     if (state == AppLifecycleState.resumed) {
+//       _refresh();
+//     }
+//   }
 
-  Future<void> _refresh() async {
-    final allowed = await AlarmTaskController.canUseFullScreenIntent();
-    if (mounted) {
-      setState(() => _allowed = allowed);
-    }
-  }
+//   Future<void> _refresh() async {
+//     final allowed = await AlarmTaskController.canUseFullScreenIntent();
+//     if (mounted) {
+//       setState(() => _allowed = allowed);
+//     }
+//   }
 
-  Future<void> _openSettings() async {
-    final opened = await AlarmTaskController.openFullScreenIntentSettings();
-    if (!opened) {
-      await AlarmTaskController.openNotificationSettings();
-    }
-    await _refresh();
-  }
+//   Future<void> _openSettings() async {
+//     final opened = await AlarmTaskController.openFullScreenIntentSettings();
+//     if (!opened) {
+//       await AlarmTaskController.openNotificationSettings();
+//     }
+//     await _refresh();
+//   }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final allowed = _allowed;
-    final color = allowed == true
-        ? SereneWakeColors.primary
-        : Theme.of(context).colorScheme.error;
-    final value = allowed == null
-        ? '...'
-        : allowed
-        ? l10n.fullScreenAlarmAllowed
-        : l10n.fullScreenAlarmNeedsAttention;
+//   @override
+//   Widget build(BuildContext context) {
+//     final l10n = AppLocalizations.of(context);
+//     final allowed = _allowed;
+//     final color = allowed == true
+//         ? SereneWakeColors.primary
+//         : Theme.of(context).colorScheme.error;
+//     final value = allowed == null
+//         ? '...'
+//         : allowed
+//         ? l10n.fullScreenAlarmAllowed
+//         : l10n.fullScreenAlarmNeedsAttention;
 
-    return InkWell(
-      onTap: _openSettings,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.fullScreenAlarmPermission,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    l10n.fullScreenAlarmDesc,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+//     return InkWell(
+//       onTap: _openSettings,
+//       child: Padding(
+//         padding: const EdgeInsets.symmetric(
+//           horizontal: AppSpacing.md,
+//           vertical: AppSpacing.sm,
+//         ),
+//         child: Row(
+//           crossAxisAlignment: CrossAxisAlignment.center,
+//           children: [
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     l10n.fullScreenAlarmPermission,
+//                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
+//                       color: Theme.of(context).colorScheme.outline,
+//                       fontWeight: FontWeight.w700,
+//                     ),
+//                   ),
+//                   const SizedBox(height: 2),
+//                   Text(
+//                     value,
+//                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+//                       fontWeight: FontWeight.w700,
+//                       color: color,
+//                       letterSpacing: 0,
+//                     ),
+//                   ),
+//                   const SizedBox(height: 2),
+//                   Text(
+//                     l10n.fullScreenAlarmDesc,
+//                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
+//                       color: Theme.of(context).colorScheme.outline,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             const SizedBox(width: AppSpacing.sm),
+//             Icon(
+//               Icons.chevron_right_rounded,
+//               color: Theme.of(context).colorScheme.outline,
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class _DefaultAlarmSettingsGroup extends ConsumerWidget {
   const _DefaultAlarmSettingsGroup();
