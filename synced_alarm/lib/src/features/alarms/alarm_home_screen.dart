@@ -139,38 +139,35 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
         bottom: false,
         child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 92),
-              child: switch (_selectedTab) {
-                0 => alarms.when(
-                  data: (items) => _AlarmListView(
-                    alarms: items,
-                    now: DateTime.now(),
-                    onCreate: () => showAlarmEditor(context),
-                    onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
-                    onToggle: (alarm, enabled) {
-                      return ref
-                          .read(alarmListControllerProvider)
-                          .toggleAlarm(alarm, enabled);
-                    },
-                    onDelete: (alarm) {
-                      return ref
-                          .read(alarmListControllerProvider)
-                          .deleteAlarm(alarm);
-                    },
-                    onTestRing: (alarm) {
-                      return ref.read(alarmListControllerProvider).ring(alarm);
-                    },
-                  ),
-                  error: (error, _) => _ErrorPanel(
-                    error: error,
-                    onRetry: () => ref.invalidate(alarmsProvider),
-                  ),
-                  loading: () => const _LoadingPanel(),
+            switch (_selectedTab) {
+              0 => alarms.when(
+                data: (items) => _AlarmListView(
+                  alarms: items,
+                  now: DateTime.now(),
+                  onCreate: () => showAlarmEditor(context),
+                  onEdit: (alarm) => showAlarmEditor(context, alarm: alarm),
+                  onToggle: (alarm, enabled) {
+                    return ref
+                        .read(alarmListControllerProvider)
+                        .toggleAlarm(alarm, enabled);
+                  },
+                  onDelete: (alarm) {
+                    return ref
+                        .read(alarmListControllerProvider)
+                        .deleteAlarm(alarm);
+                  },
+                  onTestRing: (alarm) {
+                    return ref.read(alarmListControllerProvider).ring(alarm);
+                  },
                 ),
-                _ => const SettingsPanel(),
-              },
-            ),
+                error: (error, _) => _ErrorPanel(
+                  error: error,
+                  onRetry: () => ref.invalidate(alarmsProvider),
+                ),
+                loading: () => const _LoadingPanel(),
+              ),
+              _ => const SettingsPanel(),
+            },
             Positioned(
               left: 0,
               right: 0,
