@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:synced_alarm/src/app/synced_alarm_app.dart';
@@ -16,6 +17,13 @@ import 'package:synced_alarm/src/platform/alarm_task_controller.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    PackageInfo.setMockInitialValues(
+      appName: "Let's alarm",
+      packageName: 'com.teamproject.synced_alarm',
+      version: '1.0.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
   });
 
   testWidgets('shows the alarm list shell', (WidgetTester tester) async {
@@ -69,6 +77,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Full-screen alarm'), findsOneWidget);
+  });
+
+  testWidgets('settings displays the package version from pubspec metadata', (
+    WidgetTester tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: "Let's alarm",
+      packageName: 'com.teamproject.synced_alarm',
+      version: '2.3.4',
+      buildNumber: '56',
+      buildSignature: '',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value(const <Alarm>[])),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2.3.4+56'), findsOneWidget);
   });
 
   testWidgets('toggles snooze details in the alarm editor', (

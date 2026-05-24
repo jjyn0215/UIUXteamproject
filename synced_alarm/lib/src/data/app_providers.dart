@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -82,6 +83,14 @@ final alarmRepositoryProvider = Provider<AlarmRepository>((ref) {
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   ref.watch(firebaseReadyProvider);
   return FirebaseAccountRepository();
+});
+
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final packageInfo = await PackageInfo.fromPlatform();
+  final version = packageInfo.version.trim();
+  final buildNumber = packageInfo.buildNumber.trim();
+  if (buildNumber.isEmpty) return version;
+  return '$version+$buildNumber';
 });
 
 final authStateProvider = StreamProvider<User?>((ref) async* {

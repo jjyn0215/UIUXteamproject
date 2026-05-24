@@ -116,11 +116,7 @@ class SettingsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             _SettingsSectionLabel(l10n.appInfo),
-            _SettingsGroup(
-              children: [
-                _SettingsRow(title: l10n.appVersion, value: '1.0.0+1'),
-              ],
-            ),
+            const _SettingsGroup(children: [_AppVersionSettingsRow()]),
           ],
         ),
       ),
@@ -283,6 +279,19 @@ class _SettingsRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _AppVersionSettingsRow extends ConsumerWidget {
+  const _AppVersionSettingsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final version = ref
+        .watch(appVersionProvider)
+        .maybeWhen(data: (value) => value, orElse: () => '...');
+    return _SettingsRow(title: l10n.appVersion, value: version);
   }
 }
 

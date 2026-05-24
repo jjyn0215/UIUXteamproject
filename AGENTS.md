@@ -147,7 +147,7 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 
 - 앱 기반: Flutter 프로젝트, Android 우선 실행 흐름, Web/Linux/Windows 확장 scaffold
 - 시작 안정성: `main.dart` 진입점 복구, 첫 Flutter 프레임 선표시, Firebase/알림 startup 초기화 비동기화
-- 디자인/UX: Stitch 기반 그린 테마, 앱 아이콘, 다크 모드, 한국어/영어 로컬라이징, 알람 설정 섹션 간격 조정, 설정 화면의 불필요한 스위치/정보성 항목 제거 및 compact row 구성, 홈 우상단 동기화 상태 아이콘, `FirebaseAuthException` 로그인/회원가입 오류 시 다국어(`AppLocalizations`) 매핑을 적용하여 친숙한 한글 에러 피드백 제공, 설정 화면 내 일반 설정(테마 모드 드롭다운 및 SharedPreferences 기반 로컬 영속화), 기본 알람 설정, 전체화면 알람 권한 상태 확인 및 Android 설정 이동, 앱 정보(버전 1.0.0+1 표시), 계정 설정 화면(`AccountSettingsScreen`) 추가
+- 디자인/UX: Stitch 기반 그린 테마, 앱 아이콘, 다크 모드, 한국어/영어 로컬라이징, 알람 설정 섹션 간격 조정, 설정 화면의 불필요한 스위치/정보성 항목 제거 및 compact row 구성, 홈 우상단 동기화 상태 아이콘, `FirebaseAuthException` 로그인/회원가입 오류 시 다국어(`AppLocalizations`) 매핑을 적용하여 친숙한 한글 에러 피드백 제공, 설정 화면 내 일반 설정(테마 모드 드롭다운 및 SharedPreferences 기반 로컬 영속화), 기본 알람 설정, 전체화면 알람 권한 상태 확인 및 Android 설정 이동, 앱 정보의 `pubspec.yaml` 버전 자동 표시, 계정 설정 화면(`AccountSettingsScreen`) 추가
 - 로컬 모드: Firebase 없이 알람 목록/생성/수정/삭제/활성화/비활성화 사용, `SharedPreferences` 기반 로컬 알람 영속 저장, 자동 생성 예시 알람 제거, `watchAlarms` 스트림 정렬 강제로 알람 목록 순서 요동 해결
 - 계정/그룹: Email/Password 회원가입/로그인, 로그아웃 상태 로컬 사용, 로그인 후 그룹 생성/참가/전환, 활성 그룹 기준 Firebase 저장소 전환, `_upsertCurrentUserProfile` 시 기존 `createdAt` 필드 유실 방지(보존) 적용, 설정 화면에서 계정 정보와 동기화된 기기 목록 확인
 - Firebase 구조: `users/{uid}`, `users/{uid}/groups/{groupId}`, `groups/{groupId}`, `members`, `alarms`, `devices`, `commands`, `groupSecrets/{groupId}`
