@@ -23,8 +23,7 @@ class AlarmHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<AlarmHomeScreen> createState() => _AlarmHomeScreenState();
 }
 
-class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
-    with WidgetsBindingObserver {
+class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   Timer? _timer;
   ProviderSubscription<AsyncValue<List<Alarm>>>? _alarmScheduleSubscription;
   StreamSubscription<AlarmNotificationLaunch>? _alarmLaunchSubscription;
@@ -37,13 +36,11 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _alarmScheduleSubscription = ref.listenManual<AsyncValue<List<Alarm>>>(
       alarmsProvider,
       (_, next) {
         final alarms = next.value;
         if (alarms != null) {
-          unawaited(_clearResolvedRingingAlarm());
           unawaited(_handlePendingAlarmAction(alarms));
           _handlePendingAlarmLaunch(alarms);
           if (ref.read(ringingAlarmProvider) == null) {
@@ -70,7 +67,6 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(_clearResolvedRingingAlarm());
       unawaited(_handlePendingAlarmAction());
       _handlePendingAlarmLaunch();
     });
@@ -78,19 +74,11 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _alarmScheduleSubscription?.close();
     unawaited(_alarmLaunchSubscription?.cancel());
     unawaited(_alarmActionSubscription?.cancel());
     _timer?.cancel();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_clearResolvedRingingAlarm());
-    }
   }
 
   @override
@@ -121,24 +109,21 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
 
     final title = switch (_selectedTab) {
       0 => l10n.alarms,
+      1 => l10n.history,
       _ => l10n.settings,
     };
 
-    final paddingBottom = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
-      extendBody: true,
       appBar: AppBar(
         title: Text(title),
         actions: [
           _SyncStatusButton(
             status: syncStatus,
-            onPressed: () => setState(() => _selectedTab = 1),
+            onPressed: () => setState(() => _selectedTab = 2),
           ),
         ],
       ),
       body: SafeArea(
-        bottom: false,
         child: Stack(
           children: [
             switch (_selectedTab) {
@@ -168,116 +153,47 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
                 ),
                 loading: () => const _LoadingPanel(),
               ),
+              1 => const _HistoryPanel(),
               _ => const SettingsPanel(),
             },
-            Positioned(
-              bottom: paddingBottom + 16,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTabItem(
-                      context: context,
-                      index: 0,
-                      icon: Icons.alarm_outlined,
-                      selectedIcon: Icons.alarm_rounded,
-                      label: l10n.alarms,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildTabItem(
-                      context: context,
-                      index: 1,
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings_rounded,
-                      label: l10n.settings,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_selectedTab == 0)
-              Positioned(
-                right: 20,
-                bottom: paddingBottom + 16 + 72,
-                child: FloatingActionButton(
-                  tooltip: l10n.newAlarm,
-                  onPressed: () => showAlarmEditor(context),
-                  backgroundColor: SereneWakeColors.primary,
-                  foregroundColor: SereneWakeColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.add_rounded),
-                ),
-              ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTabItem({
-    required BuildContext context,
-    required int index,
-    required IconData icon,
-    required IconData selectedIcon,
-    required String label,
-  }) {
-    final isSelected = _selectedTab == index;
-    final theme = Theme.of(context);
-    final activeColor = theme.colorScheme.primary;
-    final inactiveColor = theme.colorScheme.outline;
-
-    return SizedBox(
-      width: 86,
-      height: 62,
-      child: Material(
-        color: theme.colorScheme.surface.withAlpha(235),
-        elevation: 3,
-        shadowColor: Colors.black.withAlpha(24),
-        borderRadius: BorderRadius.circular(31),
-        child: InkWell(
-          onTap: () => setState(() => _selectedTab = index),
-          borderRadius: BorderRadius.circular(32),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? theme.colorScheme.primaryContainer.withAlpha(120)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    isSelected ? selectedIcon : icon,
-                    color: isSelected ? activeColor : inactiveColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: isSelected ? activeColor : inactiveColor,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+      floatingActionButton: _selectedTab == 0
+          ? FloatingActionButton(
+              tooltip: l10n.newAlarm,
+              onPressed: () => showAlarmEditor(context),
+              backgroundColor: SereneWakeColors.primary,
+              foregroundColor: SereneWakeColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          setState(() => _selectedTab = index);
+        },
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        indicatorColor: Theme.of(context).colorScheme.primaryContainer,
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.alarm_outlined),
+            selectedIcon: const Icon(Icons.alarm_rounded),
+            label: l10n.alarms,
           ),
-        ),
+          NavigationDestination(
+            icon: const Icon(Icons.history_rounded),
+            label: l10n.history,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings_rounded),
+            label: l10n.settings,
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +255,6 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
     _pendingAlarmAction = null;
     await AlarmTaskController.stopAlarmVibration();
     await _dueTickTracker.markHandled(alarm, DateTime.now());
-    await _dueTickTracker.markResolved(alarm, DateTime.now());
     final controller = ref.read(alarmListControllerProvider);
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
@@ -380,24 +295,13 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
   ) async {
     try {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
-      await _dueTickTracker.markResolved(alarm, DateTime.now());
       await action();
     } finally {
-      ref.read(ringingAlarmProvider.notifier).clear();
-      await AlarmTaskController.finishAlarmPresentation();
+      final finished = await AlarmTaskController.finishAlarmPresentation();
+      if (!finished) {
+        ref.read(ringingAlarmProvider.notifier).clear();
+      }
     }
-  }
-
-  Future<void> _clearResolvedRingingAlarm() async {
-    final ringingAlarm = ref.read(ringingAlarmProvider);
-    if (ringingAlarm == null) return;
-    final resolved = await _dueTickTracker.isResolved(
-      ringingAlarm,
-      DateTime.now(),
-    );
-    if (!mounted || !resolved) return;
-    await AlarmTaskController.stopAlarmVibration();
-    ref.read(ringingAlarmProvider.notifier).clear();
   }
 }
 
@@ -972,6 +876,46 @@ class _DayChip extends StatelessWidget {
               ? Theme.of(context).colorScheme.onPrimaryContainer
               : Theme.of(context).colorScheme.outline,
           fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryPanel extends StatelessWidget {
+  const _HistoryPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.margin),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 40,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    l10n.noHistory,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
