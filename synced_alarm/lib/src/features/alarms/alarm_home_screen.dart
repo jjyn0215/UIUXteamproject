@@ -124,6 +124,11 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
       _ => l10n.settings,
     };
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final paddingBottom = MediaQuery.of(context).padding.bottom;
+    const double barWidth = 200.0;
+    final double barLeft = (screenWidth - barWidth) / 2;
+
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
@@ -169,68 +174,65 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
               _ => const SettingsPanel(),
             },
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.of(context).padding.bottom + 16,
-              child: Center(
-                child: Container(
-                  width: 220,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withAlpha(235),
-                    borderRadius: BorderRadius.circular(31),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(15),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
-                      width: 1,
+              left: barLeft,
+              width: barWidth,
+              bottom: paddingBottom + 16,
+              child: Container(
+                height: 62,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withAlpha(235),
+                  borderRadius: BorderRadius.circular(31),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
+                    width: 1,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildTabItem(
-                        context: context,
-                        index: 0,
-                        icon: Icons.alarm_outlined,
-                        selectedIcon: Icons.alarm_rounded,
-                        label: l10n.alarms,
-                      ),
-                      _buildTabItem(
-                        context: context,
-                        index: 1,
-                        icon: Icons.settings_outlined,
-                        selectedIcon: Icons.settings_rounded,
-                        label: l10n.settings,
-                      ),
-                    ],
-                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildTabItem(
+                      context: context,
+                      index: 0,
+                      icon: Icons.alarm_outlined,
+                      selectedIcon: Icons.alarm_rounded,
+                      label: l10n.alarms,
+                    ),
+                    _buildTabItem(
+                      context: context,
+                      index: 1,
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings_rounded,
+                      label: l10n.settings,
+                    ),
+                  ],
                 ),
               ),
             ),
+            if (_selectedTab == 0)
+              Positioned(
+                right: 20,
+                bottom: paddingBottom + 16 + 72,
+                child: FloatingActionButton(
+                  tooltip: l10n.newAlarm,
+                  onPressed: () => showAlarmEditor(context),
+                  backgroundColor: SereneWakeColors.primary,
+                  foregroundColor: SereneWakeColors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.add_rounded),
+                ),
+              ),
           ],
         ),
       ),
-      floatingActionButton: _selectedTab == 0
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 80),
-              child: FloatingActionButton(
-                tooltip: l10n.newAlarm,
-                onPressed: () => showAlarmEditor(context),
-                backgroundColor: SereneWakeColors.primary,
-                foregroundColor: SereneWakeColors.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.add_rounded),
-              ),
-            )
-          : null,
     );
   }
 
@@ -261,7 +263,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeInOut,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
+                    horizontal: 14,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
