@@ -297,10 +297,8 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
       await action();
     } finally {
-      final finished = await AlarmTaskController.finishAlarmPresentation();
-      if (!finished) {
-        ref.read(ringingAlarmProvider.notifier).clear();
-      }
+      ref.read(ringingAlarmProvider.notifier).clear();
+      await AlarmTaskController.finishAlarmPresentation();
     }
   }
 }

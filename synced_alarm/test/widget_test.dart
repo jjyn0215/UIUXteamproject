@@ -162,6 +162,7 @@ void main() {
       call,
     ) async {
       calls.add(call);
+      if (call.method == 'finishAlarmPresentation') return true;
       return null;
     });
     FlutterLocalNotificationsPlatform.instance =
@@ -209,6 +210,9 @@ void main() {
         calls.map((call) => call.method),
         contains('finishAlarmPresentation'),
       );
+      expect(find.widgetWithText(FilledButton, 'Dismiss'), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byTooltip('New alarm'), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
