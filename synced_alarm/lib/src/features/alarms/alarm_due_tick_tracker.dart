@@ -5,13 +5,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/alarm.dart';
 
 const _handledAlarmTicksPrefsKey = 'handled_alarm_due_ticks_v1';
+const _resolvedAlarmTicksPrefsKey = 'resolved_alarm_due_ticks_v1';
 const _handledAlarmTickRetention = Duration(hours: 12);
 
 class AlarmDueTickTracker {
   final Map<String, DateTime> _handledTicks = {};
+  final Map<String, DateTime> _resolvedTicks = {};
 
   Future<bool> shouldRing(Alarm alarm, DateTime now) async {
-    await _refreshSharedTicks(now);
+    await _refreshSharedTicks(
+      prefsKey: _handledAlarmTicksPrefsKey,
+      target: _handledTicks,
+      now: now,
+    );
     final dueAt = alarmDueTimeFor(alarm, now);
     if (dueAt == null) return false;
     final justBecameDue =
@@ -20,30 +26,76 @@ class AlarmDueTickTracker {
     if (!justBecameDue) return false;
     final key = alarmDueTickKey(alarm, dueAt);
     if (_handledTicks.containsKey(key)) return false;
-    await _markKeyHandled(key, now);
+    await _markKey(
+      prefsKey: _handledAlarmTicksPrefsKey,
+      target: _handledTicks,
+      key: key,
+      now: now,
+    );
     return true;
   }
 
   Future<void> markHandled(Alarm alarm, DateTime now) async {
-    await _refreshSharedTicks(now);
+    await _refreshSharedTicks(
+      prefsKey: _handledAlarmTicksPrefsKey,
+      target: _handledTicks,
+      now: now,
+    );
     final dueAt = alarmDueTimeFor(alarm, now);
     if (dueAt == null) return;
     final key = alarmDueTickKey(alarm, dueAt);
-    await _markKeyHandled(key, now);
+    await _markKey(
+      prefsKey: _handledAlarmTicksPrefsKey,
+      target: _handledTicks,
+      key: key,
+      now: now,
+    );
   }
 
-  Future<void> _refreshSharedTicks(DateTime now) async {
+  Future<void> markResolved(Alarm alarm, DateTime now) async {
+    await _refreshSharedTicks(
+      prefsKey: _resolvedAlarmTicksPrefsKey,
+      target: _resolvedTicks,
+      now: now,
+    );
+    final dueAt = alarmDueTimeFor(alarm, now);
+    if (dueAt == null) return;
+    final key = alarmDueTickKey(alarm, dueAt);
+    await _markKey(
+      prefsKey: _resolvedAlarmTicksPrefsKey,
+      target: _resolvedTicks,
+      key: key,
+      now: now,
+    );
+  }
+
+  Future<bool> isResolved(Alarm alarm, DateTime now) async {
+    await _refreshSharedTicks(
+      prefsKey: _resolvedAlarmTicksPrefsKey,
+      target: _resolvedTicks,
+      now: now,
+    );
+    final dueAt = alarmDueTimeFor(alarm, now);
+    if (dueAt == null) return false;
+    return _resolvedTicks.containsKey(alarmDueTickKey(alarm, dueAt));
+  }
+
+  Future<void> _refreshSharedTicks({
+    required String prefsKey,
+    required Map<String, DateTime> target,
+    required DateTime now,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload();
-      final rawTicks = prefs.getString(_handledAlarmTicksPrefsKey);
+      final rawTicks = prefs.getString(prefsKey);
       if (rawTicks != null) {
         final decoded = jsonDecode(rawTicks);
         if (decoded is Map<String, Object?>) {
           for (final entry in decoded.entries) {
             final addedAt = DateTime.tryParse(entry.value?.toString() ?? '');
             if (addedAt != null) {
-              _handledTicks[entry.key] = addedAt;
+              target[entry.key] = addedAt;
             }
           }
         }
@@ -51,28 +103,31 @@ class AlarmDueTickTracker {
     } catch (_) {
       // Local alarm suppression should never crash the ring flow.
     }
-    _cleanup(now);
+    _cleanup(target, now);
   }
 
-  Future<void> _markKeyHandled(String key, DateTime now) async {
-    _handledTicks[key] = now;
-    _cleanup(now);
+  Future<void> _markKey({
+    required String prefsKey,
+    required Map<String, DateTime> target,
+    required String key,
+    required DateTime now,
+  }) async {
+    target[key] = now;
+    _cleanup(target, now);
     try {
       final prefs = await SharedPreferences.getInstance();
       final encoded = jsonEncode(
-        _handledTicks.map(
-          (key, addedAt) => MapEntry(key, addedAt.toIso8601String()),
-        ),
+        target.map((key, addedAt) => MapEntry(key, addedAt.toIso8601String())),
       );
-      await prefs.setString(_handledAlarmTicksPrefsKey, encoded);
+      await prefs.setString(prefsKey, encoded);
     } catch (_) {
       // In-memory suppression still protects the current Flutter instance.
     }
   }
 
-  void _cleanup(DateTime now) {
+  void _cleanup(Map<String, DateTime> target, DateTime now) {
     final cutoff = now.subtract(_handledAlarmTickRetention);
-    _handledTicks.removeWhere((key, addedAt) => addedAt.isBefore(cutoff));
+    target.removeWhere((key, addedAt) => addedAt.isBefore(cutoff));
   }
 }
 

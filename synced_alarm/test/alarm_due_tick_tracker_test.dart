@@ -58,4 +58,44 @@ void main() {
       isFalse,
     );
   });
+
+  test('tracks resolved due ticks separately from handled ticks', () async {
+    final alarm = Alarm(
+      id: 'alarm-1',
+      groupId: 'demo',
+      label: 'Morning standup',
+      timeOfDayMinutes: 8 * 60 + 30,
+      enabled: true,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+    final alarmActivityTracker = AlarmDueTickTracker();
+    await alarmActivityTracker.markHandled(
+      alarm,
+      DateTime(2026, 5, 8, 8, 30, 10),
+    );
+
+    final mainActivityTracker = AlarmDueTickTracker();
+    expect(
+      await mainActivityTracker.isResolved(
+        alarm,
+        DateTime(2026, 5, 8, 8, 30, 20),
+      ),
+      isFalse,
+    );
+
+    await alarmActivityTracker.markResolved(
+      alarm,
+      DateTime(2026, 5, 8, 8, 30, 30),
+    );
+
+    expect(
+      await mainActivityTracker.isResolved(
+        alarm,
+        DateTime(2026, 5, 8, 8, 30, 40),
+      ),
+      isTrue,
+    );
+  });
 }

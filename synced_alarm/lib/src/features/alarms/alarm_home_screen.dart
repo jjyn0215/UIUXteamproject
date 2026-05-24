@@ -23,7 +23,8 @@ class AlarmHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<AlarmHomeScreen> createState() => _AlarmHomeScreenState();
 }
 
-class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
+class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
+    with WidgetsBindingObserver {
   Timer? _timer;
   ProviderSubscription<AsyncValue<List<Alarm>>>? _alarmScheduleSubscription;
   StreamSubscription<AlarmNotificationLaunch>? _alarmLaunchSubscription;
@@ -36,11 +37,13 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _alarmScheduleSubscription = ref.listenManual<AsyncValue<List<Alarm>>>(
       alarmsProvider,
       (_, next) {
         final alarms = next.value;
         if (alarms != null) {
+          unawaited(_clearResolvedRingingAlarm());
           unawaited(_handlePendingAlarmAction(alarms));
           _handlePendingAlarmLaunch(alarms);
           if (ref.read(ringingAlarmProvider) == null) {
@@ -67,6 +70,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_clearResolvedRingingAlarm());
       unawaited(_handlePendingAlarmAction());
       _handlePendingAlarmLaunch();
     });
@@ -74,11 +78,19 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _alarmScheduleSubscription?.close();
     unawaited(_alarmLaunchSubscription?.cancel());
     unawaited(_alarmActionSubscription?.cancel());
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_clearResolvedRingingAlarm());
+    }
   }
 
   @override
@@ -255,6 +267,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
     _pendingAlarmAction = null;
     await AlarmTaskController.stopAlarmVibration();
     await _dueTickTracker.markHandled(alarm, DateTime.now());
+    await _dueTickTracker.markResolved(alarm, DateTime.now());
     final controller = ref.read(alarmListControllerProvider);
     switch (action.type) {
       case AlarmNotificationActionType.dismiss:
@@ -295,11 +308,24 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen> {
   ) async {
     try {
       await _dueTickTracker.markHandled(alarm, DateTime.now());
+      await _dueTickTracker.markResolved(alarm, DateTime.now());
       await action();
     } finally {
       ref.read(ringingAlarmProvider.notifier).clear();
       await AlarmTaskController.finishAlarmPresentation();
     }
+  }
+
+  Future<void> _clearResolvedRingingAlarm() async {
+    final ringingAlarm = ref.read(ringingAlarmProvider);
+    if (ringingAlarm == null) return;
+    final resolved = await _dueTickTracker.isResolved(
+      ringingAlarm,
+      DateTime.now(),
+    );
+    if (!mounted || !resolved) return;
+    await AlarmTaskController.stopAlarmVibration();
+    ref.read(ringingAlarmProvider.notifier).clear();
   }
 }
 
