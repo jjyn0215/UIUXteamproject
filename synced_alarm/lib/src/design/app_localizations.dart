@@ -136,6 +136,9 @@ class AppLocalizations {
       'permission_exact': 'Exact Alarms (Required)',
       'permission_exact_desc':
           'Ensures alarms ring precisely at the specified time.',
+      'permission_full_screen': 'Full-screen Alarm (Recommended)',
+      'permission_full_screen_desc':
+          'Shows the dedicated alarm screen while the device is locked.',
       'permission_battery': 'Ignore Battery Optimizations (Recommended)',
       'permission_battery_desc':
           'Ensures alarms operate without delay in the background.',
@@ -160,6 +163,10 @@ class AppLocalizations {
       'permission_diagnostic': 'Permission Diagnostics',
       'permission_all_granted': 'All permissions allowed',
       'permission_needs_attention': 'Permission configuration required',
+      'full_screen_alarm_permission': 'Full-screen alarm',
+      'full_screen_alarm_allowed': 'Allowed',
+      'full_screen_alarm_needs_attention': 'Permission required',
+      'full_screen_alarm_desc': 'Shows the alarm screen over the lock screen.',
       'synced_devices': 'Synced Devices',
       'default_snooze': 'Default Snooze Duration',
       'default_ring': 'Default Ring Duration',
@@ -304,6 +311,8 @@ class AppLocalizations {
       'permission_notify_desc': '알람 울림 및 실시간 동기화 알림을 수신합니다.',
       'permission_exact': '정확한 알람 예약 (필수)',
       'permission_exact_desc': '지정한 시간에 오차 없이 알람이 울리도록 합니다.',
+      'permission_full_screen': '전체화면 알람 (권장)',
+      'permission_full_screen_desc': '잠금화면 상태에서 알람 전용 화면을 표시합니다.',
       'permission_battery': '배터리 최적화 제외 (권장)',
       'permission_battery_desc': '백그라운드에서도 지연 없이 알람이 작동하도록 설정합니다.',
       'permission_grant': '설정하기',
@@ -327,6 +336,10 @@ class AppLocalizations {
       'permission_diagnostic': '알람 권한 진단',
       'permission_all_granted': '모든 필수 권한 허용됨',
       'permission_needs_attention': '일부 권한 설정 필요',
+      'full_screen_alarm_permission': '전체화면 알람',
+      'full_screen_alarm_allowed': '허용됨',
+      'full_screen_alarm_needs_attention': '권한 설정 필요',
+      'full_screen_alarm_desc': '잠금화면 위에 알람 전용 화면을 표시합니다.',
       'synced_devices': '동기화된 기기 목록',
       'default_snooze': '기본 다시 알림 간격',
       'default_ring': '기본 울림 지속 시간',
@@ -461,6 +474,9 @@ class AppLocalizations {
   String get permissionNotifyDesc => _getValue('permission_notify_desc');
   String get permissionExact => _getValue('permission_exact');
   String get permissionExactDesc => _getValue('permission_exact_desc');
+  String get permissionFullScreen => _getValue('permission_full_screen');
+  String get permissionFullScreenDesc =>
+      _getValue('permission_full_screen_desc');
   String get permissionBattery => _getValue('permission_battery');
   String get permissionBatteryDesc => _getValue('permission_battery_desc');
   String get permissionGrant => _getValue('permission_grant');
@@ -484,6 +500,12 @@ class AppLocalizations {
   String get permissionAllGranted => _getValue('permission_all_granted');
   String get permissionNeedsAttention =>
       _getValue('permission_needs_attention');
+  String get fullScreenAlarmPermission =>
+      _getValue('full_screen_alarm_permission');
+  String get fullScreenAlarmAllowed => _getValue('full_screen_alarm_allowed');
+  String get fullScreenAlarmNeedsAttention =>
+      _getValue('full_screen_alarm_needs_attention');
+  String get fullScreenAlarmDesc => _getValue('full_screen_alarm_desc');
   String get syncedDevices => _getValue('synced_devices');
   String get defaultSnooze => _getValue('default_snooze');
   String get defaultRing => _getValue('default_ring');

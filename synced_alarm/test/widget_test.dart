@@ -52,6 +52,25 @@ void main() {
     expect(find.text('Label'), findsOneWidget);
   });
 
+  testWidgets('settings exposes full-screen alarm permission status', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          alarmsProvider.overrideWith((ref) => Stream.value(const <Alarm>[])),
+        ],
+        child: const SyncedAlarmApp(),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Full-screen alarm'), findsOneWidget);
+  });
+
   testWidgets('toggles snooze details in the alarm editor', (
     WidgetTester tester,
   ) async {

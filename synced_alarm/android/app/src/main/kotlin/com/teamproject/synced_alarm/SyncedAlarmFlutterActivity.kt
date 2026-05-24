@@ -1,5 +1,6 @@
 package com.teamproject.synced_alarm
 
+import android.app.NotificationManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -71,6 +72,12 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
                         result.error("UNAVAILABLE", "Could not open notification settings", e.message)
                     }
                 }
+                "canUseFullScreenIntent" -> {
+                    result.success(canUseFullScreenIntent())
+                }
+                "openFullScreenIntentSettings" -> {
+                    result.success(openFullScreenIntentSettings())
+                }
                 else -> result.notImplemented()
             }
         }
@@ -130,6 +137,36 @@ open class SyncedAlarmFlutterActivity : FlutterActivity() {
 
     protected open fun finishAlarmPresentation(): Boolean {
         return false
+    }
+
+    private fun canUseFullScreenIntent(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return true
+        }
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        return notificationManager?.canUseFullScreenIntent() ?: false
+    }
+
+    private fun openFullScreenIntentSettings(): Boolean {
+        val intent = Intent().apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                action = Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT
+                data = Uri.parse("package:$packageName")
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            } else {
+                action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                data = Uri.fromParts("package", packageName, null)
+            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return try {
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun handleAlarmTriggerIntent(source: Intent?) {

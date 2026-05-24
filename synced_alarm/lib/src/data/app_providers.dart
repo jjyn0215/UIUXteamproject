@@ -17,6 +17,7 @@ import '../models/account.dart';
 import '../models/alarm.dart';
 import '../models/device_registration.dart';
 import '../platform/alarm_notification_service.dart';
+import '../platform/alarm_task_controller.dart';
 import 'account_repository.dart';
 import 'alarm_repository.dart';
 import 'firebase_account_repository.dart';
@@ -258,7 +259,9 @@ final deviceRegistrationProvider = FutureProvider<List<DeviceRegistration>>((
         );
         registrations.add(reg);
       } catch (e, st) {
-        debugPrint('Failed to register device for group ${group.groupId}: $e\n$st');
+        debugPrint(
+          'Failed to register device for group ${group.groupId}: $e\n$st',
+        );
         rethrow;
       }
     }
@@ -294,7 +297,8 @@ final syncStatusProvider = Provider<SyncStatus>((ref) {
       authState.hasError ||
       userGroups.hasError ||
       deviceRegistration.hasError) {
-    final error = firebaseReady.error ??
+    final error =
+        firebaseReady.error ??
         authState.error ??
         userGroups.error ??
         deviceRegistration.error;
@@ -662,8 +666,12 @@ class PermissionStateNotifier extends Notifier<AsyncValue<bool>> {
 
       final notificationGranted = await Permission.notification.isGranted;
       final exactAlarmGranted = await Permission.scheduleExactAlarm.isGranted;
+      final fullScreenIntentGranted =
+          await AlarmTaskController.canUseFullScreenIntent();
 
-      state = AsyncValue.data(notificationGranted && exactAlarmGranted);
+      state = AsyncValue.data(
+        notificationGranted && exactAlarmGranted && fullScreenIntentGranted,
+      );
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }

@@ -147,7 +147,7 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 
 - 앱 기반: Flutter 프로젝트, Android 우선 실행 흐름, Web/Linux/Windows 확장 scaffold
 - 시작 안정성: `main.dart` 진입점 복구, 첫 Flutter 프레임 선표시, Firebase/알림 startup 초기화 비동기화
-- 디자인/UX: Stitch 기반 그린 테마, 앱 아이콘, 다크 모드, 한국어/영어 로컬라이징, 알람 설정 섹션 간격 조정, 설정 화면의 불필요한 스위치/정보성 항목 제거 및 compact row 구성, 홈 우상단 동기화 상태 아이콘, `FirebaseAuthException` 로그인/회원가입 오류 시 다국어(`AppLocalizations`) 매핑을 적용하여 친숙한 한글 에러 피드백 제공, 설정 화면 내 일반 설정(테마 모드 드롭다운 및 SharedPreferences 기반 로컬 영속화), 기본 알람 설정, 앱 정보(버전 1.0.0+1 표시), 계정 설정 화면(`AccountSettingsScreen`) 추가
+- 디자인/UX: Stitch 기반 그린 테마, 앱 아이콘, 다크 모드, 한국어/영어 로컬라이징, 알람 설정 섹션 간격 조정, 설정 화면의 불필요한 스위치/정보성 항목 제거 및 compact row 구성, 홈 우상단 동기화 상태 아이콘, `FirebaseAuthException` 로그인/회원가입 오류 시 다국어(`AppLocalizations`) 매핑을 적용하여 친숙한 한글 에러 피드백 제공, 설정 화면 내 일반 설정(테마 모드 드롭다운 및 SharedPreferences 기반 로컬 영속화), 기본 알람 설정, 전체화면 알람 권한 상태 확인 및 Android 설정 이동, 앱 정보(버전 1.0.0+1 표시), 계정 설정 화면(`AccountSettingsScreen`) 추가
 - 로컬 모드: Firebase 없이 알람 목록/생성/수정/삭제/활성화/비활성화 사용, `SharedPreferences` 기반 로컬 알람 영속 저장, 자동 생성 예시 알람 제거, `watchAlarms` 스트림 정렬 강제로 알람 목록 순서 요동 해결
 - 계정/그룹: Email/Password 회원가입/로그인, 로그아웃 상태 로컬 사용, 로그인 후 그룹 생성/참가/전환, 활성 그룹 기준 Firebase 저장소 전환, `_upsertCurrentUserProfile` 시 기존 `createdAt` 필드 유실 방지(보존) 적용, 설정 화면에서 계정 정보와 동기화된 기기 목록 확인
 - Firebase 구조: `users/{uid}`, `users/{uid}/groups/{groupId}`, `groups/{groupId}`, `members`, `alarms`, `devices`, `commands`, `groupSecrets/{groupId}`
@@ -156,7 +156,7 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 - 아키텍처 개선: `joinGroup` 비즈니스 로직 중복 제거 및 `AccountRepository`로의 단일 책임 일원화. `FirebaseAlarmRepository` 및 `FirebaseDeviceRegistrar` 내 모든 Firestore 쓰기 작업을 `withFirebaseOperationTimeout`으로 처리하여 지연 차단
 - 성능/메모리: `AlarmDueTickTracker` 내 `Map<String, DateTime>` 기반 Sliding Window 방식의 12시간 주기 틱 정리를 탑재하여 메모리 누수 방지. 처리된 due tick과 실제 해제/스누즈 완료된 resolved tick은 `SharedPreferences`에도 저장하고 읽기 전 `reload()`하여 알람 전용 Activity와 메인 Activity 사이의 재울림 및 최근 앱 복귀 시 stale 알람 화면 복원을 억제합니다. `AlarmHomeScreen`의 20초 주기 타이머 리빌드(`setState`)를 알람 목록 탭(`_selectedTab == 0`)일 때만 수행하도록 제한하여 렌더링 최적화
 - 알람 설정: 이름, 시간, 요일 반복, 울림 지속 시간, 소리 on/off, 진동 on/off, 다시 알림 사용 on/off, 스누즈 간격, 스누즈 횟수, 알람 업데이트 시 `revision + 1` 증가로 버전 충돌 방지
-- Android 알림: 로컬 예약 알림, exact/inexact schedule, 요일별 반복 예약, 스누즈 1회 예약, 전용 ringing channel, full-screen intent, 잠금화면 표시/화면 켜기, `LaunchRouterActivity` 기반 앱 실행/알람 실행 분기, 잠금화면 알람 전용 `AlarmActivity`, 앱 foreground 상태에서 Android `AlarmManager` 기반 `ForegroundAlarmReceiver`가 같은 예약 시각에 Flutter launch 이벤트를 전달합니다. 이 분기는 `f42aa56` 기준 동작을 유지하기 위해 이후 라우팅 단순화/중복 launch 억제 커밋은 포함하지 않습니다. 일반 앱 실행 task는 최근 앱에 남기고, 잠금화면 알람 전용 `AlarmActivity` task만 최근 앱에서 제외합니다. 앱 시작 후 첫 예약 동기화 시 stale 예약 알림 전체 정리
+- Android 알림: 로컬 예약 알림, exact/inexact schedule, 요일별 반복 예약, 스누즈 1회 예약, 전용 ringing channel, full-screen intent, 잠금화면 표시/화면 켜기, `LaunchRouterActivity` 기반 앱 실행/알람 실행 분기, 잠금화면 알람 전용 `AlarmActivity`, 앱 foreground 상태에서 Android `AlarmManager` 기반 `ForegroundAlarmReceiver`가 같은 예약 시각에 Flutter launch 이벤트를 전달합니다. 이 분기는 `f42aa56` 기준 동작을 유지하기 위해 이후 라우팅 단순화/중복 launch 억제 커밋은 포함하지 않습니다. 일반 앱 실행 task는 최근 앱에 남기고, 잠금화면 알람 전용 `AlarmActivity` task만 최근 앱에서 제외합니다. Android 14+ full-screen intent 권한은 native `NotificationManager.canUseFullScreenIntent()`로 확인하고, 꺼진 경우 앱 설정에서 시스템 권한 화면으로 이동할 수 있습니다. 앱 시작 후 첫 예약 동기화 시 stale 예약 알림 전체 정리
 - 알람 제어: 앱 내부 `AlarmRingScreen`에 지정된 울림 지속 시간(`ringDurationMinutes`) 만료 시 구동되는 자동 스누즈 타이머 추가, 시스템 알림 `Dismiss`/`Snooze` 액션, background action callback, 알람 전용 Activity에서 액션 후 `finishAndRemoveTask()`로 메인 화면 노출 감소, 같은 tick 재울림 방지, Activity 간 공유 tick 처리로 dismiss 직후 몇 초 뒤 다시 울리는 현상 방지, 시스템 알림 액션 수신 시 백그라운드 Firebase 초기화 및 Firestore 알람 상태 patch/명령 전송 동기화 완료, 스누즈 상태일 때 Ongoing 알림으로 상단바에 상시 노출 및 앱 홈 화면 알람 카드 내에 스누즈 횟수/예정 시각 배지 및 해제 기능 연동 완료. 다시 알림이 비활성화된 알람은 앱 내부 울림 화면에서 `Snooze` 버튼을 숨기고, 울림 지속 시간이 지나면 자동 해제합니다. 앱 내부와 잠금화면 알람의 `Dismiss`/`Snooze` 후에는 native 알람 Activity 종료 성공 여부와 관계없이 Flutter의 `ringingAlarmProvider`를 정리해 최근 앱 복귀 시 알람 화면이 되살아나지 않게 합니다. 시스템 알림 액션이나 다른 기기의 `alarm.command`를 앱 내부 `AlarmRingScreen`이 수신하면 현재 표시 중인 같은 알람의 화면과 진동을 즉시 정리합니다. 스누즈 진행 알림은 action payload는 유지하되 앱 내부 알람 화면 실행 payload와 분리합니다. Android에서는 알림 채널의 시스템 진동을 끄고, `AlarmVibrationController`가 native `Vibrator` 반복 패턴을 `ringDurationMinutes` 동안 실행하며, `Dismiss`/`Snooze`/알람 화면 종료 시 즉시 중지합니다.
 - Firebase 데이터 메시지: `alarm.created`, `alarm.updated`, `alarm.deleted`, `alarm.command` 수신 시 사용자 알림을 띄우지 않는 무소음(Silent Sync) 모드로 동작. 백그라운드 수신 시 OS 네트워크 차단 및 절전 모드 지연을 완벽하게 방지하기 위해 Firestore GET 네트워크 호출을 배제하고, FCM 데이터 페이로드 자체에 포함된 상세 속성(시간, 요일, 반복 등)을 직접 파싱 및 복원하여 즉시 로컬 안드로이드 시스템 알람을 재스케줄링하도록 구현 완료. `alarm.command`는 `alarm.updated`와 순서 경쟁을 일으키지 않도록 로컬 예약을 직접 취소하지 않고, 앱에 이미 떠 있는 알람 화면을 닫는 presentation sync 신호로만 처리합니다. 예약 생성/변경/삭제는 `alarm.created`, `alarm.updated`, `alarm.deleted` 페이로드만 담당합니다.
 
@@ -169,7 +169,8 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 - `flutter analyze`
 - 전체 `flutter test`
 - `flutter build apk --debug --dart-define=USE_FIREBASE=true`
-- 주요 테스트 파일: `account_flow_test.dart`, `alarm_due_tick_tracker_test.dart`, `alarm_model_test.dart`, `alarm_notification_service_test.dart`, `device_registration_test.dart`, `local_demo_alarm_repository_test.dart`, `widget_test.dart`
+- `flutter build apk --release --dart-define=USE_FIREBASE=true`
+- 주요 테스트 파일: `account_flow_test.dart`, `alarm_due_tick_tracker_test.dart`, `alarm_model_test.dart`, `alarm_notification_service_test.dart`, `alarm_task_controller_test.dart`, `device_registration_test.dart`, `local_demo_alarm_repository_test.dart`, `widget_test.dart`
 
 ## 수동 확인이 필요한 항목
 
@@ -195,6 +196,7 @@ Android MVP의 핵심 기능은 코드 기준으로 대부분 구현되어 있�
 - 앱 내부와 시스템 알림 액션의 `Dismiss` 후 알림/울림 중지
 - 앱 내부와 시스템 알림 액션의 `Snooze` 후 설정 시간 뒤 재울림
 - 한 기기에서 `Dismiss`/`Snooze`를 누르면 다른 기기에 이미 떠 있는 같은 알람 화면과 진동이 닫히는지 확인
+- Android 14+ 기기에서 설정 > 일반 설정 > 전체화면 알람이 허용됨으로 표시되는지 확인하고, 꺼진 경우 해당 행을 눌러 시스템 설정에서 켭니다.
 - 백그라운드 복귀, 최근 앱 복귀, 알람 액션 이후 검은/흰 화면 재현 여부
 - 두 번째 Android 기기나 에뮬레이터에서 같은 그룹 알람 목록 동기화
 

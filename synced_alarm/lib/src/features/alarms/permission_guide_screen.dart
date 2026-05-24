@@ -20,6 +20,7 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
     with WidgetsBindingObserver {
   bool _notificationGranted = false;
   bool _exactAlarmGranted = false;
+  bool _fullScreenIntentGranted = false;
   bool _batteryOptimizationIgnored = false;
   bool _isLoading = true;
 
@@ -46,6 +47,8 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
   Future<void> _checkPermissions() async {
     final notificationStatus = await Permission.notification.status;
     final exactAlarmStatus = await Permission.scheduleExactAlarm.status;
+    final fullScreenIntentGranted =
+        await AlarmTaskController.canUseFullScreenIntent();
     final batteryOptimizationStatus =
         await Permission.ignoreBatteryOptimizations.status;
 
@@ -53,6 +56,7 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
       setState(() {
         _notificationGranted = notificationStatus.isGranted;
         _exactAlarmGranted = exactAlarmStatus.isGranted;
+        _fullScreenIntentGranted = fullScreenIntentGranted;
         _batteryOptimizationIgnored = batteryOptimizationStatus.isGranted;
         _isLoading = false;
       });
@@ -147,6 +151,14 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
 
   Future<void> _requestExactAlarm() async {
     await openAppSettings();
+    _checkPermissions();
+  }
+
+  Future<void> _requestFullScreenIntent() async {
+    final opened = await AlarmTaskController.openFullScreenIntentSettings();
+    if (!opened) {
+      await AlarmTaskController.openNotificationSettings();
+    }
     _checkPermissions();
   }
 
@@ -271,6 +283,19 @@ class _PermissionGuideScreenState extends ConsumerState<PermissionGuideScreen>
                       description: localizations.permissionExactDesc,
                       isGranted: _exactAlarmGranted,
                       onTap: _requestExactAlarm,
+                      primaryColor: primaryColor,
+                      cardColor: cardColor,
+                      textStyle: textStyle,
+                      mutedTextStyle: mutedTextStyle,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildPermissionCard(
+                      icon: Icons.open_in_full_rounded,
+                      title: localizations.permissionFullScreen,
+                      description: localizations.permissionFullScreenDesc,
+                      isGranted: _fullScreenIntentGranted,
+                      onTap: _requestFullScreenIntent,
                       primaryColor: primaryColor,
                       cardColor: cardColor,
                       textStyle: textStyle,

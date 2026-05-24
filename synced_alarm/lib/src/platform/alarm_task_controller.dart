@@ -59,4 +59,26 @@ class AlarmTaskController {
       return false;
     }
   }
+
+  static Future<bool> canUseFullScreenIntent() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('canUseFullScreenIntent') ??
+          false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Future<bool> openFullScreenIntentSettings() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>(
+            'openFullScreenIntentSettings',
+          ) ??
+          false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
 }
