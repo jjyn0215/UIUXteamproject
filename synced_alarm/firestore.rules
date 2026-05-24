@@ -146,8 +146,7 @@ service cloud.firestore {
       match /devices/{deviceId} {
         allow read: if isGroupMember(groupId);
         allow create: if isGroupMember(groupId) && validDevice(groupId);
-        allow update: if isGroupMember(groupId) && validDevice(groupId)
-          && resource.data.uid == request.auth.uid;
+        allow update: if isGroupMember(groupId) && validDevice(groupId);
         allow delete: if isGroupMember(groupId)
           && resource.data.uid == request.auth.uid;
       }

@@ -290,131 +290,123 @@ class _SyncedDevicesGroupState extends ConsumerState<_SyncedDevicesGroup> {
 
         final currentDeviceId = currentDeviceIdVal.value;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.xs,
-                bottom: AppSpacing.sm,
-              ),
-              child: Text(
-                '${l10n.registeredDevices} (${devices.length})',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0,
+        return Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${l10n.registeredDevices} (${devices.length})',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-            ),
-            Card(
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-              child: Column(
-                children: [
-                  for (var i = 0; i < devices.length; i++) ...[
-                    if (i > 0) const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            devices[i].platform.toLowerCase() == 'android'
-                                ? Icons.android_rounded
-                                : (devices[i].platform.toLowerCase() == 'ios'
-                                      ? Icons.phone_iphone_rounded
-                                      : Icons.computer_rounded),
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        devices[i].displayName,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (devices[i].id == currentDeviceId) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primaryContainer,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
+                const SizedBox(height: AppSpacing.sm),
+                for (var i = 0; i < devices.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          devices[i].platform.toLowerCase() == 'android'
+                              ? Icons.android_rounded
+                              : (devices[i].platform.toLowerCase() == 'ios'
+                                    ? Icons.phone_iphone_rounded
+                                    : Icons.computer_rounded),
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      devices[i].displayName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                        ),
-                                        child: Text(
-                                          l10n.thisDevice,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 9,
-                                              ),
-                                        ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (devices[i].id == currentDeviceId) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
                                       ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${l10n.lastSynced}: ${_formatLastSeen(devices[i].lastSeenAt, l10n)}',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
+                                      decoration: BoxDecoration(
                                         color: Theme.of(
                                           context,
-                                        ).colorScheme.outline,
+                                        ).colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(
+                                          4,
+                                        ),
                                       ),
-                                ),
-                              ],
-                            ),
+                                      child: Text(
+                                        l10n.thisDevice,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 9,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${l10n.lastSynced}: ${_formatLastSeen(devices[i].lastSeenAt, l10n)}',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                    ),
+                              ),
+                            ],
                           ),
-                          if (devices[i].id != currentDeviceId) ...[
-                            const SizedBox(width: AppSpacing.sm),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded),
-                              color: Theme.of(context).colorScheme.error,
-                              onPressed: _deleting
-                                  ? null
-                                  : () => _confirmUnregister(devices[i]),
-                            ),
-                          ],
+                        ),
+                        if (devices[i].id != currentDeviceId) ...[
+                          const SizedBox(width: AppSpacing.sm),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            color: Theme.of(context).colorScheme.error,
+                            onPressed: _deleting
+                                ? null
+                                : () => _confirmUnregister(devices[i]),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
       loading: () => const SizedBox.shrink(),

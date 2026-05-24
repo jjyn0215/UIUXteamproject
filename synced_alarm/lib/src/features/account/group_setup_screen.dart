@@ -39,15 +39,6 @@ class _GroupSetupScreenState extends ConsumerState<GroupSetupScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.alarmGroup),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: _busy
-                ? null
-                : () => ref.read(accountRepositoryProvider).signOut(),
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Center(

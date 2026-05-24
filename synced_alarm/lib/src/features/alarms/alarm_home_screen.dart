@@ -121,7 +121,6 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
 
     final title = switch (_selectedTab) {
       0 => l10n.alarms,
-      1 => l10n.history,
       _ => l10n.settings,
     };
 
@@ -131,7 +130,7 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
         actions: [
           _SyncStatusButton(
             status: syncStatus,
-            onPressed: () => setState(() => _selectedTab = 2),
+            onPressed: () => setState(() => _selectedTab = 1),
           ),
         ],
       ),
@@ -165,7 +164,6 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
                 ),
                 loading: () => const _LoadingPanel(),
               ),
-              1 => const _HistoryPanel(),
               _ => const SettingsPanel(),
             },
           ],
@@ -183,29 +181,106 @@ class _AlarmHomeScreenState extends ConsumerState<AlarmHomeScreen>
               child: const Icon(Icons.add_rounded),
             )
           : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedTab,
-        onDestinationSelected: (index) {
-          setState(() => _selectedTab = index);
-        },
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        indicatorColor: Theme.of(context).colorScheme.primaryContainer,
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.alarm_outlined),
-            selectedIcon: const Icon(Icons.alarm_rounded),
-            label: l10n.alarms,
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withAlpha(235),
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant.withAlpha(80),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildTabItem(
+                  context: context,
+                  index: 0,
+                  icon: Icons.alarm_outlined,
+                  selectedIcon: Icons.alarm_rounded,
+                  label: l10n.alarms,
+                ),
+                _buildTabItem(
+                  context: context,
+                  index: 1,
+                  icon: Icons.settings_outlined,
+                  selectedIcon: Icons.settings_rounded,
+                  label: l10n.settings,
+                ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.history_rounded),
-            label: l10n.history,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabItem({
+    required BuildContext context,
+    required int index,
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+  }) {
+    final isSelected = _selectedTab == index;
+    final theme = Theme.of(context);
+    final activeColor = theme.colorScheme.primary;
+    final inactiveColor = theme.colorScheme.outline;
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _selectedTab = index),
+          borderRadius: BorderRadius.circular(32),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primaryContainer.withAlpha(120)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    isSelected ? selectedIcon : icon,
+                    color: isSelected ? activeColor : inactiveColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: isSelected ? activeColor : inactiveColor,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: const Icon(Icons.settings_rounded),
-            label: l10n.settings,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -900,46 +975,6 @@ class _DayChip extends StatelessWidget {
               ? Theme.of(context).colorScheme.onPrimaryContainer
               : Theme.of(context).colorScheme.outline,
           fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _HistoryPanel extends StatelessWidget {
-  const _HistoryPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.margin),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.history_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 40,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    l10n.noHistory,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );

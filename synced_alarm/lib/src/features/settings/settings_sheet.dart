@@ -300,25 +300,12 @@ class _ThemeSettingsRow extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.themeSetting,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _getThemeName(themeMode, l10n),
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
+            child: Text(
+              l10n.themeSetting,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -358,17 +345,6 @@ class _ThemeSettingsRow extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _getThemeName(ThemeMode mode, AppLocalizations l10n) {
-    switch (mode) {
-      case ThemeMode.system:
-        return l10n.themeSystem;
-      case ThemeMode.light:
-        return l10n.themeLight;
-      case ThemeMode.dark:
-        return l10n.themeDark;
-    }
   }
 }
 
@@ -571,29 +547,12 @@ class _LanguageSettingsRow extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.language,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  currentLocale == null
-                      ? l10n.themeSystem
-                      : (currentLocale.languageCode == 'ko'
-                            ? '한국어'
-                            : 'English'),
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
+            child: Text(
+              l10n.language,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
