@@ -30,3 +30,4 @@ cd synced_alarm
 /home/devuser/flutter/bin/flutter analyze
 /home/devuser/flutter/bin/flutter test
 ```
+
