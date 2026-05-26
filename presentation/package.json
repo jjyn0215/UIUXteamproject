@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node lets_alarm_text_only_presentation.js",
     "build:sample": "node lets_alarm_visual_sample.js",
-    "build:deck": "node lets_alarm_visual_deck.js"
+    "build:deck": "node lets_alarm_visual_deck.js",
+    "build:polished": "node lets_alarm_polished_deck.js"
   },
   "dependencies": {
     "pptxgenjs": "4.0.1"
