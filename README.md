@@ -346,23 +346,45 @@ synced_alarm/
 ##### 알람 생성 흐름
 ```
 사용자 입력 → AlarmEditorSheet (UI)
-  → AlarmListController (상태 관리)
-    → AlarmRepository.addAlarm() (데이터 저장)
+  → AlarmListController.createAlarm() (상태 변경 요청)
+    → AlarmRepository.upsertAlarm() (데이터 저장)
       ├── [로컬 모드] LocalDemoAlarmRepository → SharedPreferences
-      └── [Firebase 모드] FirebaseAlarmRepository → Firestore
-        → Cloud Functions (onAlarmWrite) → FCM → 다른 기기
+      └── [로그인 + 그룹 동기화 모드] FirebaseAlarmRepository → Firestore
+          → Cloud Functions (onAlarmWrite) → FCM → 등록된 Android 기기
+    → AlarmNotificationService.scheduleAlarm()
+      → 현재 Android 기기의 로컬 알람 예약 생성
 ```
 
 ##### 알람 울림 흐름
 ```
-Android AlarmManager → ForegroundAlarmReceiver (Kotlin)
-  → Flutter MethodChannel
-    → AlarmNotificationService (알림 표시)
+[앱 사용 중]
+ForegroundAlarmScheduler / Android AlarmManager
+  → ForegroundAlarmReceiver (Kotlin)
+    → MainActivity / MethodChannel
       → AlarmHomeScreen → AlarmRingScreen (울림 UI)
-        → 사용자: Dismiss 또는 Snooze
-          → Firestore 상태 업데이트
-            → Cloud Functions (onCommandCreate)
-              → FCM → 다른 기기의 AlarmRingScreen 닫힘
+
+[백그라운드 · 잠금화면]
+AlarmNotificationService의 Android 로컬 예약
+  → full-screen intent
+    → LaunchRouterActivity → AlarmActivity
+      → AlarmRingScreen (울림 UI)
+```
+
+##### 해제 및 스누즈 제어 흐름
+```
+[AlarmRingScreen 버튼]
+사용자: Dismiss 또는 Snooze
+  → AlarmListController.dismiss() / snooze()
+    → 현재 기기의 울림 종료 및 로컬 예약 취소/재예약
+
+[시스템 알림 액션 버튼]
+사용자: Dismiss 또는 Snooze
+  → AlarmNotificationService.handleBackgroundNotificationResponse()
+    → 현재 기기의 로컬 예약 취소/재예약
+
+[로그인 + 그룹 동기화 모드에서 공통으로 추가 수행]
+alarms 문서 갱신 → onAlarmWrite → 등록된 Android 기기의 예약 상태 갱신
+commands 문서 생성 → onCommandCreate → 등록된 Android 기기의 표시 중 같은 알람 화면 정리
 ```
 
 ##### 멀티 디바이스 동기화 흐름
@@ -374,8 +396,10 @@ Android AlarmManager → ForegroundAlarmReceiver (Kotlin)
         → 기기 B (백그라운드/포그라운드)
           → AlarmNotificationService.showRemoteMessage()
             → FCM 페이로드에서 알람 속성 직접 파싱
-              → Android 로컬 알람 즉시 재스케줄링
-                (Firestore GET 없이 오프라인에서도 동작)
+              → Firestore 재조회 없이 Android 로컬 알람 예약 갱신
+
+※ 새로운 변경 메시지를 수신하려면 네트워크 연결이 필요하며,
+  이미 기기에 예약된 알람은 네트워크가 끊겨도 해당 기기에서 울릴 수 있습니다.
 ```
 
 ### (3) 주요 기능 설명
