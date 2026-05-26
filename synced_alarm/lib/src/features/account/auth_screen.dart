@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/app_providers.dart';
@@ -43,101 +44,106 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.alarm_rounded,
-                        color: SereneWakeColors.primary,
-                        size: 44,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0,
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.alarm_rounded,
+                          color: SereneWakeColors.primary,
+                          size: 44,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0,
+                              ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        if (_creatingAccount) ...[
+                          TextField(
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.name],
+                            decoration: InputDecoration(
+                              labelText: l10n.name,
+                              prefixIcon: const Icon(
+                                Icons.person_outline_rounded,
+                              ),
                             ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      if (_creatingAccount) ...[
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
                         TextField(
-                          controller: _nameController,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          autocorrect: false,
                           decoration: InputDecoration(
-                            labelText: l10n.name,
-                            prefixIcon: const Icon(
-                              Icons.person_outline_rounded,
-                            ),
+                            labelText: l10n.email,
+                            prefixIcon: const Icon(Icons.mail_outline_rounded),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
-                      ],
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                          labelText: l10n.email,
-                          prefixIcon: const Icon(Icons.mail_outline_rounded),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _submit(),
+                          autofillHints: const [AutofillHints.password],
+                          decoration: InputDecoration(
+                            labelText: l10n.password,
+                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          labelText: l10n.password,
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                        ),
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.xl),
-                      FilledButton.icon(
-                        onPressed: _busy ? null : _submit,
-                        icon: _busy
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                        if (_error != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
                                 ),
-                              )
-                            : const Icon(Icons.login_rounded),
-                        label: Text(title),
-                      ),
-                      TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () {
-                                setState(() {
-                                  _creatingAccount = !_creatingAccount;
-                                  _error = null;
-                                });
-                              },
-                        child: Text(
-                          _creatingAccount
-                              ? l10n.useExistingAccount
-                              : l10n.createNewAccount,
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xl),
+                        FilledButton.icon(
+                          onPressed: _busy ? null : _submit,
+                          icon: _busy
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.login_rounded),
+                          label: Text(title),
                         ),
-                      ),
-                    ],
+                        TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _creatingAccount = !_creatingAccount;
+                                    _error = null;
+                                  });
+                                },
+                          child: Text(
+                            _creatingAccount
+                                ? l10n.useExistingAccount
+                                : l10n.createNewAccount,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -178,6 +184,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       } else {
         await repository.signIn(email: email, password: password);
       }
+      TextInput.finishAutofillContext();
       if (!mounted) return;
       setState(() => _busy = false);
       if (Navigator.of(context).canPop()) {
