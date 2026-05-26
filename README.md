@@ -64,7 +64,7 @@ cd synced_alarm
 
 ### (2) 전체 구조도 설명
 
-*   발표용 FigJam 구조도: [Synced Alarm Simple Firebase Proposal Diagram](https://www.figma.com/board/8B2eBuLka5J5P3yXcT1ifS?utm_source=other&utm_content=edit_in_figjam&oai_id=&request_id=b452d917-f2ec-44e7-9385-7b16d8364d4d)
+*   발표용 FigJam 구조도: [Firebase 동기화와 Android 로컬 알람 구조](https://www.figma.com/board/8B2eBuLka5J5P3yXcT1ifS)
 
 ```mermaid
 flowchart TB
@@ -234,6 +234,9 @@ PC 앱은 FCM 직접 수신 대상이 아니라, 앱이 실행 중일 때 Firest
 ### (2) 전체 구조도 설명
 
 #### 2-1. 전체 시스템 구조도
+
+*   편집 가능한 발표용 구조도: [Firebase 동기화와 Android 로컬 알람 구조](https://www.figma.com/board/8B2eBuLka5J5P3yXcT1ifS)
+*   발표 핵심: **FCM은 변경 및 제어 동기화 신호를 전달하고, 실제 정각 울림은 각 Android 기기의 로컬 예약이 담당합니다.**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
