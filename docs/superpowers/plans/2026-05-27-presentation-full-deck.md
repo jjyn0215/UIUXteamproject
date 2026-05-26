@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `presentation/lets_alarm_visual_sample.js`
 
-- [ ] **Step 1: Guard sample generation and export approved primitives**
+- [x] **Step 1: Guard sample generation and export approved primitives**
 
 Wrap the existing three slide calls in `writeSampleDeck()` and export the drawing helpers used by the complete deck:
 
@@ -42,7 +42,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 2: Confirm the original sample still builds**
+- [x] **Step 2: Confirm the original sample still builds**
 
 Run:
 
@@ -60,7 +60,7 @@ Expected: `Lets_alarm_발표자료_시각시안_3장.pptx` remains generated wit
 - Modify: `presentation/package.json`
 - Create: `presentation/Lets_alarm_발표자료_완성본_8장.pptx`
 
-- [ ] **Step 1: Add the complete-deck build command**
+- [x] **Step 1: Add the complete-deck build command**
 
 ```json
 {
@@ -70,7 +70,7 @@ Expected: `Lets_alarm_발표자료_시각시안_3장.pptx` remains generated wit
 }
 ```
 
-- [ ] **Step 2: Compose all eight required slides**
+- [x] **Step 2: Compose all eight required slides**
 
 The new source imports approved helpers and creates these slides in order:
 
@@ -96,7 +96,7 @@ FCM은 동기화 신호, 실제 울림은 Android 로컬 예약
 실기기 확인 필요: 두 Android 기기 간 동기화 안정성
 ```
 
-- [ ] **Step 3: Keep UI media locations replaceable**
+- [x] **Step 3: Keep UI media locations replaceable**
 
 The UI slides retain clearly captioned frames for later real app screenshots:
 
@@ -113,7 +113,7 @@ The UI slides retain clearly captioned frames for later real app screenshots:
 - Test: `presentation/lets_alarm_visual_deck.js`
 - Test: `presentation/Lets_alarm_발표자료_완성본_8장.pptx`
 
-- [ ] **Step 1: Generate and validate the full deck**
+- [x] **Step 1: Generate and validate the full deck**
 
 Run:
 
@@ -128,7 +128,7 @@ npm audit --omit=dev --audit-level=high
 
 Expected: both PPTX files generate and audit reports zero high-severity vulnerabilities.
 
-- [ ] **Step 2: Verify slide count, text, and font references**
+- [x] **Step 2: Verify slide count, text, and font references**
 
 Run:
 
@@ -151,7 +151,7 @@ git diff --check -- presentation
 
 Expected: eight slides exist, core content/font references are present, and no whitespace errors occur.
 
-- [ ] **Step 3: Attempt rendered validation and report environmental limits**
+- [x] **Step 3: Attempt rendered validation and report environmental limits**
 
 Run:
 
@@ -163,7 +163,7 @@ python3 /home/devuser/.codex/skills/slides/scripts/render_slides.py \
 
 Expected: PNG rendering succeeds when LibreOffice and Python rendering dependencies exist; otherwise report unavailable dependencies explicitly.
 
-- [ ] **Step 4: Commit only presentation implementation files**
+- [x] **Step 4: Commit only presentation implementation files**
 
 ```bash
 git add presentation/package.json \

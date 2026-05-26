@@ -251,10 +251,10 @@ function validateSlide(slide) {
   warnIfSlideElementsOutOfBounds(slide, pptx);
 }
 
-function addCoverSlide() {
+function addCoverSlide(page = "01", section = "PROJECT OVERVIEW") {
   const slide = pptx.addSlide();
   addFullBackground(slide, false);
-  addMeta(slide, "PROJECT OVERVIEW", "01");
+  addMeta(slide, section, page);
 
   text(slide, "Android first", 0.66, 1.24, 2.3, 0.27, {
     fontSize: 10,
@@ -322,17 +322,22 @@ function addCoverSlide() {
   validateSlide(slide);
 }
 
-function addFeatureSlide() {
+function addFeatureSlide(
+  page = "02",
+  section = "UI FUNCTION",
+  heading = "주요 UI 기능",
+  lead = "알람 관리부터 울림 제어와 동기화 상태까지, 조작 중심으로 설계했습니다."
+) {
   const slide = pptx.addSlide();
   addFullBackground(slide, false);
-  addMeta(slide, "UI FUNCTION", "02");
+  addMeta(slide, section, page);
 
-  text(slide, "주요 UI 기능", 0.65, 1.1, 4.2, 0.5, {
+  text(slide, heading, 0.65, 1.1, 7.2, 0.5, {
     fontFace: TITLE_FONT,
     fontSize: 28,
     bold: true,
   });
-  text(slide, "알람 관리부터 울림 제어와 동기화 상태까지, 조작 중심으로 설계했습니다.", 0.67, 1.7, 7.2, 0.3, {
+  text(slide, lead, 0.67, 1.7, 7.2, 0.3, {
     fontSize: 11,
     color: C.muted,
   });
@@ -464,10 +469,10 @@ function addArrow(slide, x, y, w, label) {
   }
 }
 
-function addArchitectureSlide() {
+function addArchitectureSlide(page = "03", section = "SYSTEM ARCHITECTURE") {
   const slide = pptx.addSlide();
   addFullBackground(slide, true);
-  addMeta(slide, "SYSTEM ARCHITECTURE", "03", true);
+  addMeta(slide, section, page, true);
 
   text(slide, "Firebase 기반 동기화 알람 구조", 0.65, 1.09, 7.25, 0.48, {
     fontFace: TITLE_FONT,
@@ -586,14 +591,38 @@ function addArchitectureSlide() {
   validateSlide(slide);
 }
 
-addCoverSlide();
-addFeatureSlide();
-addArchitectureSlide();
+async function writeSampleDeck() {
+  addCoverSlide();
+  addFeatureSlide();
+  addArchitectureSlide();
+  await pptx.writeFile({ fileName: OUTPUT });
+  console.log(`PPTX 생성 완료: ${OUTPUT}`);
+}
 
-pptx
-  .writeFile({ fileName: OUTPUT })
-  .then(() => console.log(`PPTX 생성 완료: ${OUTPUT}`))
-  .catch((error) => {
+if (require.main === module) {
+  writeSampleDeck().catch((error) => {
     console.error("PPTX 생성 실패:", error);
     process.exitCode = 1;
   });
+}
+
+module.exports = {
+  pptx,
+  C,
+  TITLE_FONT,
+  TITLE_LIGHT,
+  BODY_FONT,
+  text,
+  shape,
+  addIcon,
+  addFullBackground,
+  addMeta,
+  addTag,
+  addPhonePlaceholder,
+  addNode,
+  addArrow,
+  validateSlide,
+  addCoverSlide,
+  addFeatureSlide,
+  addArchitectureSlide,
+};
