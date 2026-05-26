@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Let's alarm 발표자료 PPTX 생성 소스",
   "scripts": {
-    "build": "node lets_alarm_text_only_presentation.js"
+    "build": "node lets_alarm_text_only_presentation.js",
+    "build:sample": "node lets_alarm_visual_sample.js"
   },
   "dependencies": {
     "pptxgenjs": "4.0.1"
