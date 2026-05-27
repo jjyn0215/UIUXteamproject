@@ -101,3 +101,34 @@ Android에 예약된 시각이 도달하면 `LaunchRouterActivity`가 일반 앱
 
 **Q. 로그인하지 않아도 사용할 수 있나요?**  
 네. 로그아웃 상태에서는 해당 기기의 로컬 알람으로 사용할 수 있고, 로그인 후 그룹에 참가하면 기기 간 동기화 기능을 사용할 수 있습니다.
+
+### 구조 및 패턴 질문
+
+**Q. 이 프로젝트는 어떤 구조나 디자인 패턴을 사용했나요?**  
+엄격한 하나의 아키텍처 이름을 붙이기보다는 역할을 분리한 구조로 구현했습니다. 화면은 사용자 입력과 표시를 담당하고, `AlarmListController`가 상태 변경 요청을 처리하며, `AlarmRepository`가 저장 방식을 추상화합니다. 실제 Android 예약과 알림 실행은 `AlarmNotificationService`와 네이티브 Activity가 담당합니다. 이 중 저장소 부분에는 **Repository 패턴**을, 앱 상태 연결에는 **Riverpod Provider 패턴**을 사용했습니다.
+
+**Q. Repository 패턴을 사용한 이유는 무엇인가요?**  
+로그아웃 상태에서는 `LocalDemoAlarmRepository`가 `SharedPreferences`에 저장하고, 로그인 후 그룹 동기화 상태에서는 `FirebaseAlarmRepository`가 Firestore에 저장합니다. UI와 Controller는 동일한 `AlarmRepository` 인터페이스만 사용하므로, 저장 방식이 바뀌어도 알람 화면 로직을 크게 바꾸지 않아도 됩니다.
+
+**Q. Riverpod을 사용한 이유는 무엇인가요?**  
+로그인 상태, 활성 그룹, 알람 목록, 동기화 상태, 현재 울리는 알람처럼 여러 화면이 함께 참조하는 상태가 있습니다. Riverpod으로 이 상태와 Repository 의존성을 제공하면, 인증이나 그룹 선택이 바뀔 때 연결된 UI와 저장소 선택을 반응형으로 갱신할 수 있습니다.
+
+**Q. MVC나 MVVM으로 구현한 것인가요?**  
+발표에서는 특정 패턴을 완전히 따랐다고 설명하기보다, Flutter UI와 Controller, Repository, Platform Service를 분리한 계층형 구조라고 설명하는 것이 정확합니다. ViewModel이라는 별도 계층을 엄격하게 정의한 구조는 아니며, Riverpod Provider와 Controller가 화면 상태 및 동작 요청을 연결합니다.
+
+### Firebase 및 플랫폼 선택 질문
+
+**Q. Firestore를 쓰는데 Cloud Functions와 FCM이 별도로 필요한 이유는 무엇인가요?**  
+Firestore는 공유 알람의 원본 데이터를 저장합니다. Cloud Functions는 서버 측에서 변경을 감지하고, FCM은 백그라운드에 있는 다른 Android 기기에도 변경 정보를 전달합니다. 즉, 저장은 Firestore, 변경 감지와 전달 요청은 Functions, 기기 수신은 FCM으로 역할을 분리했습니다.
+
+**Q. Firestore 실시간 동기화만 사용하면 되지 않나요?**  
+앱이 열려 있을 때는 Firestore 변경 스트림으로 화면 상태를 갱신할 수 있습니다. 하지만 백그라운드나 잠금화면 상태의 다른 기기에도 변경된 알람 예약을 반영하려면 별도의 전달 경로가 필요합니다. 이 프로젝트에서는 FCM 데이터 메시지를 받아 Android 로컬 예약을 갱신하도록 구현했습니다.
+
+**Q. Cloud Functions 없이 앱에서 바로 다른 기기로 보내면 안 되나요?**  
+클라이언트가 직접 다른 기기의 토큰을 관리하거나 발송 권한을 가지면 보안과 관리가 불리합니다. Functions가 그룹의 등록 기기를 기준으로 서버 측에서 메시지를 전달하도록 하면, 클라이언트는 공유 데이터를 저장하는 역할에 집중하고 전송 권한과 대상 관리는 서버 영역에 둘 수 있습니다.
+
+**Q. Flutter로 개발했는데 왜 Kotlin 코드와 Android Activity가 필요한가요?**  
+일반 UI는 Flutter로 구현했지만, 잠금화면에서의 전체화면 알람 표시, Android 로컬 예약 트리거, 알람 전용 화면의 종료 동작은 Android 플랫폼 기능과 직접 연결됩니다. 그래서 `LaunchRouterActivity`와 `AlarmActivity` 같은 네이티브 경로를 두고 Flutter의 `AlarmRingScreen`으로 연결했습니다.
+
+**Q. 전체 구조도에는 왜 로그아웃 상태의 로컬 모드가 크게 보이지 않나요?**  
+구조도는 이 프로젝트의 핵심 차별점인 그룹 공유 동기화 경로를 중심으로 표현했습니다. 로그아웃 상태에서는 Firebase 경로를 사용하지 않고, 앱의 로컬 저장소와 Android 로컬 예약만으로 기본 알람 기능을 사용할 수 있습니다.
